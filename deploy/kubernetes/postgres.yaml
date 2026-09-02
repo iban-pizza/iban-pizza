@@ -1,0 +1,135 @@
+# iban.pizza on Kubernetes with PostgreSQL.
+#
+# For deployments that maintain the dataset centrally or want to refresh it
+# without rolling out a new image. Apply after deployment.yaml; this file
+# overrides the Deployment to point at the database and adds a loader.
+#
+#     kubectl apply -f deploy/kubernetes/deployment.yaml
+#     kubectl apply -f deploy/kubernetes/postgres.yaml
+#
+# It assumes a PostgreSQL reachable as "postgres" in the same namespace. Bring
+# your own; a database operator or managed service is the right tool, and a
+# throwaway one is easy to add for a trial.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: iban-pizza-db
+type: Opaque
+stringData:
+  # Change this. It is the whole connection string, so it carries the
+  # password and belongs in a Secret rather than a ConfigMap.
+  url: postgres://openiban:changeme@postgres:5432/openiban?sslmode=disable
+---
+# Fills the database from the official registries. Runs to completion once;
+# re-run it to refresh:
+#
+#     kubectl create job --from=cronjob/iban-pizza-loader refresh-now
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: iban-pizza-loader
+spec:
+  # Shortly after each quarter starts, when the German register is
+  # republished. Adjust to taste; the daily sources do not mind more often.
+  schedule: "0 6 5 1,4,7,10 *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+          containers:
+            - name: loader
+              image: ghcr.io/netzfabrikcom/iban-pizza:0.1.0
+              args: ["update", "-log-format", "json"]
+              env:
+                - name: OPENIBAN_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: iban-pizza-db
+                      key: url
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+---
+# The same Deployment as in deployment.yaml, reading from the database.
+#
+# This is a complete copy rather than a patch. A partial Deployment does not
+# merge reliably under plain "kubectl apply", and the point of these files is
+# that they work with one command and no extra tooling.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iban-pizza
+  labels:
+    app.kubernetes.io/name: iban-pizza
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: iban-pizza
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: iban-pizza
+    spec:
+      # The image runs as 65534 already; stating it here makes the pod
+      # security admission controller happy and stops anyone overriding it.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: iban-pizza
+          image: ghcr.io/netzfabrikcom/iban-pizza:0.1.0
+          args: ["serve", "-addr", ":8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Cross origin access is closed by default. Set the origins your
+            # frontend is served from, or "*" for any.
+            - name: OPENIBAN_CORS_ORIGINS
+              value: ""
+            - name: OPENIBAN_LOG_FORMAT
+              value: json
+            - name: OPENIBAN_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: iban-pizza-db
+                  key: url
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          # readyz fails until bank data is loaded, which with the embedded
+          # snapshot is immediate. healthz stays 200 while the service can
+          # answer at all; stale data is reported in its body, not as a
+          # failure, so old data does not take a working pod out of rotation.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30

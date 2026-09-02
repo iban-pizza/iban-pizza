@@ -7,12 +7,27 @@ A ground up rewrite of the [goiban](https://github.com/apilayer/goiban) family
 of projects, whose last release was in 2019.
 
 ```
-docker run -p 8080:8080 ghcr.io/netzfabrikcom/iban-pizza:latest
+docker run -p 8080:8080 ghcr.io/netzfabrikcom/iban-pizza:0.1.0
 curl http://localhost:8080/v2/iban/DE89370400440532013000
 ```
 
 No database, no data directory, no configuration. The bank data is compiled
-into the binary.
+into the binary, so nothing has to be downloaded before the first request.
+
+## Getting started
+
+**[docs/deployment.md](docs/deployment.md)** covers every way to run it:
+
+- **Binary**, downloaded from the
+  [releases page](https://github.com/NETZFABRIKCOM/iban-pizza/releases),
+  verified against `SHA256SUMS`, run with one command. Includes a systemd unit.
+- **Docker and Compose**, standalone or with PostgreSQL.
+- **Kubernetes**, from the manifests in `deploy/kubernetes/`.
+- **Keeping the data current**, and what is and is not compiled in.
+
+Releases are built by GitHub Actions from a tag: static binaries for Linux,
+macOS and Windows, a multi architecture container image on GHCR, and a
+checksum file, all attached to the release.
 
 ## What it does
 

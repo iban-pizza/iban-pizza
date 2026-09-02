@@ -133,11 +133,18 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Install cosign
+        if: github.event.repository.private == false
         uses: sigstore/cosign-installer@v4
 
       - name: Sign the image
         # Keyless signing binds the signature to this workflow run rather than
         # to a key someone has to store and rotate.
+        #
+        # It is skipped while the repository is private. Keyless signing writes
+        # to the public Rekor transparency log, and the entry names the
+        # repository and workflow path. That would disclose a private
+        # repository's existence, so signing starts when the repository does.
+        if: github.event.repository.private == false
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
