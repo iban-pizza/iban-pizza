@@ -20,19 +20,19 @@ func runServe(ctx context.Context, args []string) error {
 	var data dataSource
 	data.bind(fs)
 
-	addr := fs.String("addr", envOr("OPENIBAN_ADDR", ":8080"), "address to listen on")
-	baseURL := fs.String("base-url", envOr("OPENIBAN_BASE_URL", ""),
+	addr := fs.String("addr", envOr("IBAN_PIZZA_ADDR", ":8080"), "address to listen on")
+	baseURL := fs.String("base-url", envOr("IBAN_PIZZA_BASE_URL", ""),
 		"public base URL, used to build absolute logo links")
-	origins := fs.String("cors-origins", envOr("OPENIBAN_CORS_ORIGINS", ""),
+	origins := fs.String("cors-origins", envOr("IBAN_PIZZA_CORS_ORIGINS", ""),
 		`comma separated allowed origins, or "*" for any (default: no cross origin access)`)
-	rateLimit := fs.Int("rate-limit", envInt("OPENIBAN_RATE_LIMIT", 600),
+	rateLimit := fs.Int("rate-limit", envInt("IBAN_PIZZA_RATE_LIMIT", 600),
 		"requests per minute per client address, 0 disables the limit")
-	staleAfter := fs.Duration("stale-after", envDuration("OPENIBAN_STALE_AFTER", api.DefaultStaleAfter),
+	staleAfter := fs.Duration("stale-after", envDuration("IBAN_PIZZA_STALE_AFTER", api.DefaultStaleAfter),
 		"age at which data is reported as stale")
-	schemeFile := fs.String("scheme-file", envOr("OPENIBAN_SCHEME_FILE", ""),
+	schemeFile := fs.String("scheme-file", envOr("IBAN_PIZZA_SCHEME_FILE", ""),
 		"directory holding EPC register CSV exports, enabling the schemes block")
-	logFormat := fs.String("log-format", envOr("OPENIBAN_LOG_FORMAT", "json"), "json or text")
-	logLevel := fs.String("log-level", envOr("OPENIBAN_LOG_LEVEL", "info"), "debug, info, warn or error")
+	logFormat := fs.String("log-format", envOr("IBAN_PIZZA_LOG_FORMAT", "json"), "json or text")
+	logLevel := fs.String("log-level", envOr("IBAN_PIZZA_LOG_LEVEL", "info"), "debug, info, warn or error")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -52,7 +52,7 @@ func runServe(ctx context.Context, args []string) error {
 		if oldest, ok := stats.OldestRetrieval(); ok {
 			age := time.Since(oldest.RetrievedAt)
 			if age > *staleAfter {
-				log.Warn("bank data is stale, run \"openiban update\"",
+				log.Warn("bank data is stale, run \"iban-pizza update\"",
 					"source", oldest.Name,
 					"retrieved", oldest.RetrievedAt.Format(time.RFC3339),
 					"ageDays", int(age.Hours()/24))

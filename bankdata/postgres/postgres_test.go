@@ -11,7 +11,7 @@ import (
 	"github.com/netzfabrikcom/iban-pizza/bankdata/postgres"
 )
 
-// testStore connects to the database named by OPENIBAN_TEST_DATABASE_URL.
+// testStore connects to the database named by IBAN_PIZZA_TEST_DATABASE_URL.
 //
 // The tests skip when that variable is unset, so a plain "go test ./..." on a
 // laptop stays green without a database. CI sets it against a service
@@ -19,9 +19,9 @@ import (
 func testStore(t *testing.T) *postgres.Store {
 	t.Helper()
 
-	url := os.Getenv("OPENIBAN_TEST_DATABASE_URL")
+	url := os.Getenv("IBAN_PIZZA_TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("set OPENIBAN_TEST_DATABASE_URL to run the PostgreSQL tests")
+		t.Skip("set IBAN_PIZZA_TEST_DATABASE_URL to run the PostgreSQL tests")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -34,7 +34,7 @@ func testStore(t *testing.T) *postgres.Store {
 	t.Cleanup(store.Close)
 
 	// Each test starts from an empty table. The database may hold real data
-	// from an "openiban update" run, and a search assertion counting rows
+	// from an "iban-pizza update" run, and a search assertion counting rows
 	// would then measure that instead of the fixtures.
 	//
 	// Clearing goes through Replace rather than a truncate helper, so the

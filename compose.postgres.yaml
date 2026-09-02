@@ -19,7 +19,7 @@
 services:
   iban:
     environment:
-      OPENIBAN_DATABASE_URL: postgres://openiban:openiban@db:5432/openiban?sslmode=disable
+      IBAN_PIZZA_DATABASE_URL: postgres://ibanpizza:ibanpizza@db:5432/ibanpizza?sslmode=disable
     depends_on:
       db:
         condition: service_healthy
@@ -36,7 +36,7 @@ services:
       - -snapshot
       - embedded
       - -database-url
-      - postgres://openiban:openiban@db:5432/openiban?sslmode=disable
+      - postgres://ibanpizza:ibanpizza@db:5432/ibanpizza?sslmode=disable
       - -log-format
       - text
     depends_on:
@@ -47,13 +47,13 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: openiban
-      POSTGRES_PASSWORD: openiban
-      POSTGRES_DB: openiban
+      POSTGRES_USER: ibanpizza
+      POSTGRES_PASSWORD: ibanpizza
+      POSTGRES_DB: ibanpizza
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openiban"]
+      test: ["CMD-SHELL", "pg_isready -U ibanpizza"]
       interval: 5s
       timeout: 5s
       retries: 10

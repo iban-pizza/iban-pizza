@@ -1,4 +1,4 @@
-// Command openiban serves and maintains the iban.pizza service.
+// Command iban-pizza serves and maintains the iban.pizza service.
 package main
 
 import (
@@ -21,16 +21,16 @@ import (
 // version is set at link time with -ldflags "-X main.version=..."
 var version = "dev"
 
-const usage = `openiban serves IBAN validation and bank lookup.
+const usage = `iban-pizza serves IBAN validation and bank lookup.
 
 Usage:
-  openiban serve      [flags]   Run the HTTP service
-  openiban update     [flags]   Refresh bank data from the official registries
-  openiban import     [flags]   Load a registry file per country, or copy a snapshot into a store
-  openiban snapshot   [flags]   Write the current data to a snapshot file
-  openiban version              Print the version
+  iban-pizza serve      [flags]   Run the HTTP service
+  iban-pizza update     [flags]   Refresh bank data from the official registries
+  iban-pizza import     [flags]   Load a registry file per country, or copy a snapshot into a store
+  iban-pizza snapshot   [flags]   Write the current data to a snapshot file
+  iban-pizza version              Print the version
 
-Run "openiban <command> -h" for the flags of a command.
+Run "iban-pizza <command> -h" for the flags of a command.
 `
 
 func main() {
@@ -64,7 +64,7 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "openiban: %v\n", err)
+		fmt.Fprintf(os.Stderr, "iban-pizza: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -90,9 +90,9 @@ type dataSource struct {
 }
 
 func (d *dataSource) bind(fs *flag.FlagSet) {
-	fs.StringVar(&d.file, "data-file", envOr("OPENIBAN_DATA_FILE", ""),
+	fs.StringVar(&d.file, "data-file", envOr("IBAN_PIZZA_DATA_FILE", ""),
 		"path to a snapshot file, overriding the snapshot built into the binary")
-	fs.StringVar(&d.databaseURL, "database-url", envOr("OPENIBAN_DATABASE_URL", ""),
+	fs.StringVar(&d.databaseURL, "database-url", envOr("IBAN_PIZZA_DATABASE_URL", ""),
 		"PostgreSQL connection string, used instead of a snapshot")
 }
 
@@ -124,7 +124,7 @@ func (d *dataSource) openRepository(ctx context.Context, log *slog.Logger) (bank
 			if errors.Is(err, embedded.ErrEmpty) {
 				return nil, nil, errors.New(
 					"this binary has no embedded snapshot; pass -data-file or -database-url, " +
-						"or run \"openiban update --write-snapshot\" before building")
+						"or run \"iban-pizza update --write-snapshot\" before building")
 			}
 			return nil, nil, fmt.Errorf("load embedded snapshot: %w", err)
 		}

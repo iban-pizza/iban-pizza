@@ -42,7 +42,7 @@ jobs:
     name: PostgreSQL backend
     runs-on: ubuntu-latest
 
-    # These tests skip themselves when OPENIBAN_TEST_DATABASE_URL is unset, so
+    # These tests skip themselves when IBAN_PIZZA_TEST_DATABASE_URL is unset, so
     # they stay out of the way of a local "go test ./..." while still being
     # exercised on every push.
     services:
@@ -67,7 +67,7 @@ jobs:
 
       - name: Test the PostgreSQL backend
         env:
-          OPENIBAN_TEST_DATABASE_URL: postgres://postgres:test@127.0.0.1:5432/iban?sslmode=disable
+          IBAN_PIZZA_TEST_DATABASE_URL: postgres://postgres:test@127.0.0.1:5432/iban?sslmode=disable
         run: go test ./bankdata/postgres/ -race -count=1 -v
 
   vulncheck:
@@ -92,13 +92,13 @@ jobs:
           cache: true
 
       - name: Build
-        run: CGO_ENABLED=0 go build -trimpath -o /tmp/openiban ./cmd/openiban
+        run: CGO_ENABLED=0 go build -trimpath -o /tmp/iban-pizza ./cmd/iban-pizza
 
       # The binary has to answer correctly with no configuration at all,
       # because that is the whole point of the embedded snapshot.
       - name: Smoke test the zero configuration start
         run: |
-          /tmp/openiban serve -addr 127.0.0.1:8080 -log-format text &
+          /tmp/iban-pizza serve -addr 127.0.0.1:8080 -log-format text &
           pid=$!
           trap 'kill $pid' EXIT
 

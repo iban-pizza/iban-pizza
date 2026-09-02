@@ -29,7 +29,7 @@ func runImport(ctx context.Context, args []string) error {
 		`"auto" uses the built in parser for the country, "generic" reads the documented CSV layout`)
 	dryRun := fs.Bool("dry-run", false, "parse and report but do not store anything")
 	snapshotPath := fs.String("write-snapshot", "", "also write the result to this snapshot file")
-	logFormat := fs.String("log-format", envOr("OPENIBAN_LOG_FORMAT", "text"), "json or text")
+	logFormat := fs.String("log-format", envOr("IBAN_PIZZA_LOG_FORMAT", "text"), "json or text")
 
 	if err := fs.Parse(args); err != nil {
 		return err

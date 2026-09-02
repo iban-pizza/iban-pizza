@@ -6,7 +6,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 all: test build
 
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/openiban ./cmd/openiban
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/iban-pizza ./cmd/iban-pizza
 
 test:
 	go test ./... -race -count=1
@@ -23,11 +23,11 @@ vuln:
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
 run: build
-	./bin/openiban serve -scheme-file data/schemes -log-format text
+	./bin/iban-pizza serve -scheme-file data/schemes -log-format text
 
 # Refresh the bank data and the embedded snapshot from the official registries.
 update: build
-	./bin/openiban update --write-snapshot internal/embedded/snapshot.jsonl.gz --scheme-dir data/schemes
+	./bin/iban-pizza update --write-snapshot internal/embedded/snapshot.jsonl.gz --scheme-dir data/schemes
 
 docker:
 	docker build --build-arg VERSION=$(VERSION) -t iban-pizza:$(VERSION) .

@@ -2,6 +2,6 @@
 coverage.out
 *.test
 
-# Scheme exports are downloaded by "openiban update --scheme-dir" and are not
+# Scheme exports are downloaded by "iban-pizza update --scheme-dir" and are not
 # checked in; the embedded snapshot under internal/embedded is.
 /data/schemes/

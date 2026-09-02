@@ -48,7 +48,7 @@ jobs:
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
             os="${target%/*}"
             arch="${target#*/}"
-            name="openiban_${VERSION}_${os}_${arch}"
+            name="iban-pizza_${VERSION}_${os}_${arch}"
             ext=""
             [ "$os" = "windows" ] && ext=".exe"
 
@@ -57,7 +57,7 @@ jobs:
               -trimpath \
               -ldflags "-s -w -X main.version=${VERSION}" \
               -o "dist/${name}${ext}" \
-              ./cmd/openiban
+              ./cmd/iban-pizza
           done
 
           cd dist
@@ -85,7 +85,7 @@ jobs:
             data snapshot is compiled in, so the service answers immediately
             with no configuration. Refresh the data with:
 
-                openiban update --write-snapshot internal/embedded/snapshot.jsonl.gz
+                iban-pizza update --write-snapshot internal/embedded/snapshot.jsonl.gz
 
             Verify a download against SHA256SUMS before running it.
 

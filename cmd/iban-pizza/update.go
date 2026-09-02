@@ -25,8 +25,8 @@ func runUpdate(ctx context.Context, args []string) error {
 	snapshotPath := fs.String("write-snapshot", "",
 		"also write the result to this snapshot file")
 	schemeDir := fs.String("scheme-dir", "", "also refresh the EPC scheme register into this directory")
-	logFormat := fs.String("log-format", envOr("OPENIBAN_LOG_FORMAT", "text"), "json or text")
-	logLevel := fs.String("log-level", envOr("OPENIBAN_LOG_LEVEL", "info"), "debug, info, warn or error")
+	logFormat := fs.String("log-format", envOr("IBAN_PIZZA_LOG_FORMAT", "text"), "json or text")
+	logLevel := fs.String("log-level", envOr("IBAN_PIZZA_LOG_LEVEL", "info"), "debug, info, warn or error")
 
 	if err := fs.Parse(args); err != nil {
 		return err

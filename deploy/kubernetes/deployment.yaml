@@ -40,9 +40,9 @@ spec:
           env:
             # Cross origin access is closed by default. Set the origins your
             # frontend is served from, or "*" for any.
-            - name: OPENIBAN_CORS_ORIGINS
+            - name: IBAN_PIZZA_CORS_ORIGINS
               value: ""
-            - name: OPENIBAN_LOG_FORMAT
+            - name: IBAN_PIZZA_LOG_FORMAT
               value: json
           securityContext:
             allowPrivilegeEscalation: false

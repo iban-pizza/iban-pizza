@@ -38,12 +38,12 @@ it, and run it:
 ```sh
 # Linux, amd64. Substitute the version and your platform.
 V=0.1.0
-curl -LO https://github.com/NETZFABRIKCOM/iban-pizza/releases/download/v$V/openiban_v${V}_linux_amd64
+curl -LO https://github.com/NETZFABRIKCOM/iban-pizza/releases/download/v$V/iban-pizza_v${V}_linux_amd64
 curl -LO https://github.com/NETZFABRIKCOM/iban-pizza/releases/download/v$V/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
 
-chmod +x openiban_v${V}_linux_amd64
-./openiban_v${V}_linux_amd64 serve
+chmod +x iban-pizza_v${V}_linux_amd64
+./iban-pizza_v${V}_linux_amd64 serve
 ```
 
 That is the whole installation. The binary is static, so it runs on any Linux
@@ -62,14 +62,14 @@ A systemd unit that runs it as an unprivileged user with the hardening that
 costs nothing:
 
 ```ini
-# /etc/systemd/system/openiban.service
+# /etc/systemd/system/iban-pizza.service
 [Unit]
 Description=iban.pizza
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/openiban serve -addr 127.0.0.1:8080
+ExecStart=/usr/local/bin/iban-pizza serve -addr 127.0.0.1:8080
 Restart=on-failure
 DynamicUser=yes
 ProtectSystem=strict
@@ -92,19 +92,19 @@ unit file, a container and a shell all configure it the same way.
 
 | Flag | Variable | Default | Purpose |
 |---|---|---|---|
-| `-addr` | `OPENIBAN_ADDR` | `:8080` | listen address |
-| `-cors-origins` | `OPENIBAN_CORS_ORIGINS` | none | comma separated origins, or `*` |
-| `-rate-limit` | `OPENIBAN_RATE_LIMIT` | 600 | requests per minute per client, 0 disables |
-| `-data-file` | `OPENIBAN_DATA_FILE` | | snapshot file, overrides the embedded one |
-| `-database-url` | `OPENIBAN_DATABASE_URL` | | PostgreSQL connection string |
-| `-scheme-file` | `OPENIBAN_SCHEME_FILE` | | directory of EPC exports |
-| `-stale-after` | `OPENIBAN_STALE_AFTER` | 120 days | age at which data is reported stale |
-| `-base-url` | `OPENIBAN_BASE_URL` | | public URL, for absolute logo links |
-| `-log-format` | `OPENIBAN_LOG_FORMAT` | `json` | `json` or `text` |
-| `-log-level` | `OPENIBAN_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `-addr` | `IBAN_PIZZA_ADDR` | `:8080` | listen address |
+| `-cors-origins` | `IBAN_PIZZA_CORS_ORIGINS` | none | comma separated origins, or `*` |
+| `-rate-limit` | `IBAN_PIZZA_RATE_LIMIT` | 600 | requests per minute per client, 0 disables |
+| `-data-file` | `IBAN_PIZZA_DATA_FILE` | | snapshot file, overrides the embedded one |
+| `-database-url` | `IBAN_PIZZA_DATABASE_URL` | | PostgreSQL connection string |
+| `-scheme-file` | `IBAN_PIZZA_SCHEME_FILE` | | directory of EPC exports |
+| `-stale-after` | `IBAN_PIZZA_STALE_AFTER` | 120 days | age at which data is reported stale |
+| `-base-url` | `IBAN_PIZZA_BASE_URL` | | public URL, for absolute logo links |
+| `-log-format` | `IBAN_PIZZA_LOG_FORMAT` | `json` | `json` or `text` |
+| `-log-level` | `IBAN_PIZZA_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 Cross origin access is closed unless you open it. A browser frontend on
-another origin needs `OPENIBAN_CORS_ORIGINS` set to that origin.
+another origin needs `IBAN_PIZZA_CORS_ORIGINS` set to that origin.
 
 ## 2. Docker and Compose
 
@@ -113,7 +113,7 @@ docker run -p 8080:8080 ghcr.io/netzfabrikcom/iban-pizza:0.1.0
 ```
 
 The image is built `FROM scratch`: the binary, the certificate roots for
-`openiban update`, and nothing else. No shell, no package manager, no libc. It
+`iban-pizza update`, and nothing else. No shell, no package manager, no libc. It
 runs as uid 65534.
 
 ### While the repository is private
@@ -136,7 +136,7 @@ private. Once it is public, the image pulls without any login.
 With Compose, the repository carries two files:
 
 ```sh
-# The service alone. Publishes port 8080; change it with OPENIBAN_PORT.
+# The service alone. Publishes port 8080; change it with IBAN_PIZZA_PORT.
 docker compose up
 
 # The service backed by PostgreSQL. The loader copies the snapshot from the
@@ -214,7 +214,7 @@ For the PostgreSQL variant this means the loader copies the snapshot out of
 the image rather than fetching:
 
 ```sh
-openiban import -snapshot embedded -database-url postgres://...
+iban-pizza import -snapshot embedded -database-url postgres://...
 ```
 
 That is what the Compose file and the Kubernetes CronJob do. Run it after
@@ -236,18 +236,18 @@ its date.
 
 ```sh
 # The file does not have to exist; update creates it and its directory.
-openiban update --write-snapshot /var/lib/openiban/data.gz
-openiban serve  -data-file /var/lib/openiban/data.gz
+iban-pizza update --write-snapshot /var/lib/iban-pizza/data.gz
+iban-pizza serve  -data-file /var/lib/iban-pizza/data.gz
 ```
 
-`openiban update` fetches from the official registries directly, resolving the
+`iban-pizza update` fetches from the official registries directly, resolving the
 current download links from the publishers' pages at run time. `--dry-run`
 downloads and parses without storing, `--countries DE,AT` limits the run.
 
 **Refresh into PostgreSQL**, for several instances sharing one dataset:
 
 ```sh
-openiban update -database-url postgres://...
+iban-pizza update -database-url postgres://...
 ```
 
 `update` always fetches from the publishers. `--countries DE,AT` limits which
@@ -256,20 +256,20 @@ registries it fetches, but it never reads a local file. For that there is
 
 ## Importing a file you already have
 
-`openiban import` loads one registry file per country into any of the three
+`iban-pizza import` loads one registry file per country into any of the three
 stores, without contacting a publisher. Use it when the host has no outbound
 network, when a registry's site is down, or for a registry you licensed and
 may not redistribute, such as UK sort codes or the French FIB.
 
 ```sh
 # A file in a registry's own format, parsed by the built in parser.
-openiban import -country DE -file blz-aktuell.txt -database-url postgres://...
+iban-pizza import -country DE -file blz-aktuell.txt -database-url postgres://...
 
 # Into a snapshot file instead of a database.
-openiban import -country AT -file sepa-zv-vz_gesamt.csv --write-snapshot /var/lib/openiban/data.gz
+iban-pizza import -country AT -file sepa-zv-vz_gesamt.csv --write-snapshot /var/lib/iban-pizza/data.gz
 
 # Check what a file would produce before touching anything.
-openiban import -country CZ -file kody_bank_CR.csv --dry-run
+iban-pizza import -country CZ -file kody_bank_CR.csv --dry-run
 ```
 
 `-snapshot` copies every source of a snapshot instead of one file: a path, or
@@ -295,7 +295,7 @@ loosely: `Bank Code`, `bank_code` and `bankCode` are the same column, as are
 overrides `-country` per row, so one file may carry several countries.
 
 ```sh
-openiban import -country GB -file sortcodes.csv -source "Licensed sort code directory" \
+iban-pizza import -country GB -file sortcodes.csv -source "Licensed sort code directory" \
                 -database-url postgres://...
 ```
 
@@ -312,8 +312,8 @@ EPC Register of Participants. That register is not compiled in. Fetch it once
 and point the service at the directory:
 
 ```sh
-openiban update --scheme-dir /var/lib/openiban/schemes
-openiban serve  -scheme-file /var/lib/openiban/schemes
+iban-pizza update --scheme-dir /var/lib/iban-pizza/schemes
+iban-pizza serve  -scheme-file /var/lib/iban-pizza/schemes
 ```
 
 Without it, v2 omits the `schemes` block and everything else works unchanged.

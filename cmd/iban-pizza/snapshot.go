@@ -16,7 +16,7 @@ func runSnapshot(ctx context.Context, args []string) error {
 	data.bind(fs)
 
 	out := fs.String("out", "internal/embedded/snapshot.jsonl.gz", "path to write the snapshot to")
-	logFormat := fs.String("log-format", envOr("OPENIBAN_LOG_FORMAT", "text"), "json or text")
+	logFormat := fs.String("log-format", envOr("IBAN_PIZZA_LOG_FORMAT", "text"), "json or text")
 
 	if err := fs.Parse(args); err != nil {
 		return err

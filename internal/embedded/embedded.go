@@ -2,7 +2,7 @@
 //
 // This is what makes the zero configuration single binary possible: it starts
 // and answers correctly with no database, no data directory and no network.
-// The snapshot is refreshed by "openiban update --write-snapshot" and checked
+// The snapshot is refreshed by "iban-pizza update --write-snapshot" and checked
 // in, so its age is visible in the repository rather than hidden in a build.
 package embedded
 

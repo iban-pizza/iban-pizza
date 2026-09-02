@@ -17,8 +17,8 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build \
         -trimpath \
         -ldflags "-s -w -X main.version=${VERSION}" \
-        -o /openiban \
-        ./cmd/openiban
+        -o /iban-pizza \
+        ./cmd/iban-pizza
 
 # Runtime stage.
 #
@@ -27,9 +27,9 @@ RUN CGO_ENABLED=0 go build \
 # compiled into the binary, which is what makes this possible.
 FROM scratch
 
-# Certificate roots, needed by "openiban update" to reach the registries.
+# Certificate roots, needed by "iban-pizza update" to reach the registries.
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=build /openiban /openiban
+COPY --from=build /iban-pizza /iban-pizza
 
 # An unprivileged, non existent user. scratch has no /etc/passwd, so the
 # numeric form is the only one that works.
@@ -39,5 +39,5 @@ EXPOSE 8080
 
 # No shell exists here, so this is the exec form by necessity as well as by
 # preference.
-ENTRYPOINT ["/openiban"]
+ENTRYPOINT ["/iban-pizza"]
 CMD ["serve", "-addr", ":8080"]

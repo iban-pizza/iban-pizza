@@ -18,7 +18,7 @@ type: Opaque
 stringData:
   # Change this. It is the whole connection string, so it carries the
   # password and belongs in a Secret rather than a ConfigMap.
-  url: postgres://openiban:changeme@postgres:5432/openiban?sslmode=disable
+  url: postgres://iban-pizza:changeme@postgres:5432/ibanpizza?sslmode=disable
 ---
 # Copies the reviewed snapshot from the image into the database. Nothing in
 # the cluster contacts a publisher, so the namespace can deny all egress. Run
@@ -53,7 +53,7 @@ spec:
               image: ghcr.io/netzfabrikcom/iban-pizza:0.1.0
               args: ["import", "-snapshot", "embedded", "-log-format", "json"]
               env:
-                - name: OPENIBAN_DATABASE_URL
+                - name: IBAN_PIZZA_DATABASE_URL
                   valueFrom:
                     secretKeyRef:
                       name: iban-pizza-db
@@ -103,11 +103,11 @@ spec:
           env:
             # Cross origin access is closed by default. Set the origins your
             # frontend is served from, or "*" for any.
-            - name: OPENIBAN_CORS_ORIGINS
+            - name: IBAN_PIZZA_CORS_ORIGINS
               value: ""
-            - name: OPENIBAN_LOG_FORMAT
+            - name: IBAN_PIZZA_LOG_FORMAT
               value: json
-            - name: OPENIBAN_DATABASE_URL
+            - name: IBAN_PIZZA_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: iban-pizza-db

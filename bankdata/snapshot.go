@@ -173,7 +173,7 @@ func SaveSnapshotFile(ctx context.Context, path string, repo Repository) error {
 
 	// os.CreateTemp makes the file readable only by its owner, and the rename
 	// carries that through. A snapshot written by a deployment or cron user
-	// would then be unreadable to the service account running "openiban
+	// would then be unreadable to the service account running "iban-pizza
 	// serve". The data is a public bank register, so it gets ordinary file
 	// permissions.
 	if err := os.Chmod(tmpName, 0o644); err != nil {

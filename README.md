@@ -96,7 +96,7 @@ since August 2019. The rewrite addresses what that age produced.
 
 **Its bundled data froze on 2019-07-25.** Two of the seven download URLs in its
 `sources.txt` are dead today, and Germany's institution count has fallen from
-about 17,000 to 13,806 since. Here, `openiban update` resolves the official
+about 17,000 to 13,806 since. Here, `iban-pizza update` resolves the official
 endpoints at run time, `/healthz` reports the age of every dataset, and a
 scheduled job opens a pull request every quarter so a missed refresh is visible
 instead of silent.
@@ -155,13 +155,13 @@ repository, and the loader became a subcommand of the same binary.
 |---|---|
 | `goiban` | `iban/`, `internal/checkdigit/` |
 | `goiban-data` | `bankdata/`, rewritten because the original carries no licence |
-| `goiban-data-loader` | `internal/sources/` plus `openiban update` |
-| `goiban-service` | `internal/api/` plus `openiban serve` |
+| `goiban-data-loader` | `internal/sources/` plus `iban-pizza update` |
+| `goiban-service` | `internal/api/` plus `iban-pizza serve` |
 
 ### Three ways data gets in
 
 **1. Do nothing.** A snapshot of every registry is compiled into the binary,
-so `openiban serve` answers immediately. The whole dataset is about 110 KB
+so `iban-pizza serve` answers immediately. The whole dataset is about 110 KB
 compressed for 4,423 institutions. This is the default and needs no network, no
 file and no database.
 
@@ -169,8 +169,8 @@ file and no database.
 
 ```sh
 # The file does not have to exist. update creates it, and the directory too.
-openiban update --write-snapshot /var/lib/openiban/data.gz
-openiban serve  -data-file /var/lib/openiban/data.gz
+iban-pizza update --write-snapshot /var/lib/iban-pizza/data.gz
+iban-pizza serve  -data-file /var/lib/iban-pizza/data.gz
 ```
 
 No rebuild is involved. `--countries DE,AT` refreshes a subset, and `--dry-run`
@@ -180,12 +180,12 @@ registry has changed its format.
 **3. Refresh into PostgreSQL**, for central maintenance across instances:
 
 ```sh
-openiban update -database-url postgres://user:pass@host/iban
-openiban serve  -database-url postgres://user:pass@host/iban
+iban-pizza update -database-url postgres://user:pass@host/iban
+iban-pizza serve  -database-url postgres://user:pass@host/iban
 ```
 
 There is no separate step to enable PostgreSQL. Passing `-database-url`, or
-setting `OPENIBAN_DATABASE_URL`, is the whole switch. The schema is created on
+setting `IBAN_PIZZA_DATABASE_URL`, is the whole switch. The schema is created on
 connect, so an empty database is enough to start, and the loader has to run
 once before the service can answer anything.
 
@@ -202,7 +202,7 @@ against it. Refresh later without touching the service:
 docker compose -f compose.yaml -f compose.postgres.yaml run --rm loader
 ```
 
-In every case `openiban update` resolves the download links from the
+In every case `iban-pizza update` resolves the download links from the
 publishers' pages at run time, refuses to replace existing data when a download
 or parse fails, and swaps one country at a time so a broken registry cannot
 take the others down with it.
@@ -210,7 +210,7 @@ take the others down with it.
 **4. Import a file you already have**, per country, with no network:
 
 ```sh
-openiban import -country DE -file blz-aktuell.txt -database-url postgres://...
+iban-pizza import -country DE -file blz-aktuell.txt -database-url postgres://...
 ```
 
 Built in parsers cover the countries in the snapshot; every other country
@@ -242,12 +242,12 @@ and certificate roots and nothing else.
 ### Binary
 
 ```sh
-openiban serve                       # embedded snapshot, no configuration
-openiban serve -data-file data.gz    # a snapshot refreshed without a rebuild
-openiban serve -database-url postgres://...
+iban-pizza serve                       # embedded snapshot, no configuration
+iban-pizza serve -data-file data.gz    # a snapshot refreshed without a rebuild
+iban-pizza serve -database-url postgres://...
 ```
 
-Flags, each with an `OPENIBAN_`-prefixed environment variable equivalent:
+Flags, each with an `IBAN_PIZZA_`-prefixed environment variable equivalent:
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -264,7 +264,7 @@ Flags, each with an `OPENIBAN_`-prefixed environment variable equivalent:
 ### Refreshing the data
 
 ```sh
-openiban update --write-snapshot internal/embedded/snapshot.jsonl.gz \
+iban-pizza update --write-snapshot internal/embedded/snapshot.jsonl.gz \
                 --scheme-dir data/schemes
 ```
 
@@ -302,7 +302,7 @@ internal/checkdigit/  German account check digit methods
 internal/logo/        Brand mapping and monogram generation
 internal/api/         v1 compatibility surface, v2, middleware, interface
 internal/embedded/    The bank data snapshot compiled into the binary
-cmd/openiban/         serve, update, snapshot, version
+cmd/iban-pizza/         serve, update, snapshot, version
 ```
 
 `iban` and `bankdata` are public packages, so the core stays importable as a

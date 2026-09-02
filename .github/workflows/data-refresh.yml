@@ -30,7 +30,7 @@ jobs:
       - name: Refresh the snapshot and the scheme register
         id: refresh
         run: |
-          go run ./cmd/openiban update \
+          go run ./cmd/iban-pizza update \
             --write-snapshot internal/embedded/snapshot.jsonl.gz \
             --scheme-dir data/schemes \
             --log-format text 2>&1 | tee refresh.log
@@ -46,8 +46,8 @@ jobs:
 
       - name: Verify the service starts with the new snapshot
         run: |
-          go build -o /tmp/openiban ./cmd/openiban
-          /tmp/openiban serve -addr 127.0.0.1:8080 -log-format text &
+          go build -o /tmp/iban-pizza ./cmd/iban-pizza
+          /tmp/iban-pizza serve -addr 127.0.0.1:8080 -log-format text &
           pid=$!
           trap 'kill $pid' EXIT
           for i in $(seq 1 20); do
