@@ -3,7 +3,12 @@
 #
 #     docker compose -f compose.yaml -f compose.postgres.yaml up
 #
-# The loader fills the database once and exits. Run it again at any time to
+# The loader copies the reviewed snapshot out of the image into the database
+# and exits. It never contacts a publisher, so the stack needs no outbound
+# network. To fetch from the publishers directly, replace "import -snapshot
+# embedded" with "update"; that is fresher at the cost of egress from the host.
+#
+# The loader runs once and exits. Run it again at any time to
 # refresh the data without touching the service:
 #
 #     docker compose -f compose.yaml -f compose.postgres.yaml run --rm loader
@@ -27,7 +32,9 @@ services:
     image: ghcr.io/netzfabrikcom/iban-pizza:latest
     build: .
     command:
-      - update
+      - import
+      - -snapshot
+      - embedded
       - -database-url
       - postgres://openiban:openiban@db:5432/openiban?sslmode=disable
       - -log-format

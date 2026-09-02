@@ -44,7 +44,7 @@ func WriteSnapshot(ctx context.Context, w io.Writer, repo Repository) error {
 	// Search is capped, so pull everything through the store directly when the
 	// repository can provide it. MemoryStore is the only writer target today.
 	if ms, ok := repo.(*MemoryStore); ok {
-		banks = ms.all()
+		banks = ms.All()
 	}
 
 	gz := gzip.NewWriter(w)
@@ -67,9 +67,9 @@ func WriteSnapshot(ctx context.Context, w io.Writer, repo Repository) error {
 	return gz.Close()
 }
 
-// all returns every record in deterministic order so that snapshots of equal
+// All returns every record in deterministic order so that snapshots of equal
 // content are byte identical, which keeps them diffable in git.
-func (s *MemoryStore) all() []Bank {
+func (s *MemoryStore) All() []Bank {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -180,4 +180,39 @@ func SaveSnapshotFile(ctx context.Context, path string, repo Repository) error {
 		return err
 	}
 	return os.Rename(tmpName, path)
+}
+
+// CopySources writes every source held in from into to, one source at a time.
+//
+// This is how reviewed data reaches a database without the database host ever
+// contacting a publisher: the snapshot compiled into the image was fetched,
+// tested and reviewed in the release pipeline, and this copies it across. Each
+// source is replaced as a unit, so a partially applied copy cannot leave a
+// country half loaded.
+func CopySources(ctx context.Context, from *MemoryStore, to Writer) ([]SourceInfo, error) {
+	stats, err := from.Stats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	bySource := make(map[string][]Bank, len(stats.Sources))
+	for _, b := range from.All() {
+		bySource[b.Source] = append(bySource[b.Source], b)
+	}
+
+	copied := make([]SourceInfo, 0, len(stats.Sources))
+	for _, info := range stats.Sources {
+		banks := bySource[info.Name]
+		if len(banks) == 0 {
+			// A source with metadata but no records is a broken snapshot,
+			// and replacing a country with nothing is not a copy.
+			return copied, fmt.Errorf("source %q has no records", info.Name)
+		}
+		if err := to.Replace(ctx, info, banks); err != nil {
+			return copied, fmt.Errorf("copy %s: %w", info.Name, err)
+		}
+		info.RecordCount = len(banks)
+		copied = append(copied, info)
+	}
+	return copied, nil
 }

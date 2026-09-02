@@ -139,8 +139,8 @@ With Compose, the repository carries two files:
 # The service alone. Publishes port 8080; change it with OPENIBAN_PORT.
 docker compose up
 
-# The service backed by PostgreSQL, with a loader that fills the database
-# once and exits. Data can then be refreshed without restarting the service.
+# The service backed by PostgreSQL. The loader copies the snapshot from the
+# image into the database and exits; it never contacts a publisher.
 docker compose -f compose.yaml -f compose.postgres.yaml up
 docker compose -f compose.yaml -f compose.postgres.yaml run --rm loader
 ```
@@ -156,16 +156,17 @@ extra tooling:
 kubectl apply -f deploy/kubernetes/deployment.yaml
 
 # Backed by PostgreSQL: a Secret for the connection string, a CronJob that
-# refreshes the data each quarter, and the same Deployment reading from the
-# database. Bring your own PostgreSQL; the manifest expects it as "postgres".
+# copies the image's snapshot into the database, and the same Deployment
+# reading from it. Bring your own PostgreSQL; the manifest expects it as
+# "postgres".
 kubectl apply -f deploy/kubernetes/postgres.yaml
 ```
 
 Change the connection string in the Secret before applying it. To load data
-right away instead of waiting for the schedule:
+right away, and after every image rollout:
 
 ```sh
-kubectl create job --from=cronjob/iban-pizza-loader refresh-now
+kubectl create job --from=cronjob/iban-pizza-loader sync-now
 ```
 
 The probes are chosen so that old data does not take a pod out of rotation:
@@ -187,6 +188,40 @@ curl http://localhost:8080/v2/data
 orchestrators poll it and it should stay small. Every v2 answer also stamps
 the retrieval date of each source it used as `dataAsOf`, so a single response
 can be dated without a second request.
+
+## Security model for data
+
+Three facts make the model simple:
+
+- **`serve` never downloads.** It reads the embedded snapshot, a file, or a
+  database. A production host can deny all outbound traffic and the service
+  does not notice. Do that where you can.
+- **Only `update` contacts a publisher**, and it belongs in a pipeline, not
+  on a production host. The `data-refresh` workflow runs it in CI, runs the
+  test suite against what came back, and opens a pull request that shows the
+  record count per country. A person reviews that before it becomes part of a
+  release. Production then receives data as a reviewed artifact.
+- **`import` covers the exceptions** without any network: a licensed file,
+  an air gapped host, a registry site that is down.
+
+What `update` does defend against, for the pipeline where it runs: TLS with
+certificate verification, a hard size cap per download, parse before store,
+and refusal to replace existing data when a download or parse fails. What it
+cannot defend against is a publisher shipping wrong data, because none of the
+registries sign their files. That is why the pull request review exists.
+
+For the PostgreSQL variant this means the loader copies the snapshot out of
+the image rather than fetching:
+
+```sh
+openiban import -snapshot embedded -database-url postgres://...
+```
+
+That is what the Compose file and the Kubernetes CronJob do. Run it after
+every image rollout and the database matches the image; nothing in
+production ever talks to a registry. Fetching in cluster with `update` is
+possible and documented in both manifests, and it is a deliberate trade of
+egress for freshness rather than the default.
 
 ## Keeping the data current
 
@@ -237,7 +272,9 @@ openiban import -country AT -file sepa-zv-vz_gesamt.csv --write-snapshot /var/li
 openiban import -country CZ -file kody_bank_CR.csv --dry-run
 ```
 
-Each import replaces that source's records and leaves every other country
+`-snapshot` copies every source of a snapshot instead of one file: a path, or
+`embedded` for the snapshot built into the binary. Each import replaces that
+source's records and leaves every other country
 untouched, so countries can be loaded one at a time and in any order. The
 file's modification time is recorded as the retrieval time, so an old file is
 reported as old by `/v2/data` rather than looking fresh because it was

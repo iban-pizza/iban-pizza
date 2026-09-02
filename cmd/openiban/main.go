@@ -26,7 +26,7 @@ const usage = `openiban serves IBAN validation and bank lookup.
 Usage:
   openiban serve      [flags]   Run the HTTP service
   openiban update     [flags]   Refresh bank data from the official registries
-  openiban import     [flags]   Load a registry file you already have, per country
+  openiban import     [flags]   Load a registry file per country, or copy a snapshot into a store
   openiban snapshot   [flags]   Write the current data to a snapshot file
   openiban version              Print the version
 

@@ -20,10 +20,16 @@ stringData:
   # password and belongs in a Secret rather than a ConfigMap.
   url: postgres://openiban:changeme@postgres:5432/openiban?sslmode=disable
 ---
-# Fills the database from the official registries. Runs to completion once;
+# Copies the reviewed snapshot from the image into the database. Nothing in
+# the cluster contacts a publisher, so the namespace can deny all egress. Run
+# it after every image rollout. To fetch from the publishers in cluster
+# instead, set args to ["update", "-log-format", "json"]: fresher, but that
+# is egress from production, which is the trade to weigh.
+#
+# Formerly: fills the database from the official registries. Runs to completion once;
 # re-run it to refresh:
 #
-#     kubectl create job --from=cronjob/iban-pizza-loader refresh-now
+#     kubectl create job --from=cronjob/iban-pizza-loader sync-now
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -31,7 +37,7 @@ metadata:
 spec:
   # Shortly after each quarter starts, when the German register is
   # republished. Adjust to taste; the daily sources do not mind more often.
-  schedule: "0 6 5 1,4,7,10 *"
+  schedule: "0 6 * * 1"
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
@@ -45,7 +51,7 @@ spec:
           containers:
             - name: loader
               image: ghcr.io/netzfabrikcom/iban-pizza:0.1.0
-              args: ["update", "-log-format", "json"]
+              args: ["import", "-snapshot", "embedded", "-log-format", "json"]
               env:
                 - name: OPENIBAN_DATABASE_URL
                   valueFrom:

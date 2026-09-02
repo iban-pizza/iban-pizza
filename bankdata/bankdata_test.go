@@ -283,3 +283,73 @@ func TestSnapshotFileIsReadable(t *testing.T) {
 		t.Errorf("snapshot mode is %04o, want 0644", perm)
 	}
 }
+
+func TestAllIsCompleteAndOrdered(t *testing.T) {
+	s := loadedStore(t)
+	got := s.All()
+	if len(got) != len(sampleBanks()) {
+		t.Fatalf("All returned %d records, want %d", len(got), len(sampleBanks()))
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i-1].BankCode > got[i].BankCode {
+			t.Errorf("All is not ordered: %s before %s", got[i-1].BankCode, got[i].BankCode)
+		}
+	}
+}
+
+// TestCopySources covers the path by which reviewed snapshot data reaches a
+// database without any download: every source and every record must arrive,
+// and the source metadata must travel with them.
+func TestCopySources(t *testing.T) {
+	from := loadedStore(t)
+	ctx := context.Background()
+	czInfo := SourceInfo{Country: "CZ", Name: "CNB", URL: "https://example.invalid/cz",
+		RetrievedAt: time.Now().Add(-48 * time.Hour).UTC()}
+	if err := from.Replace(ctx, czInfo, []Bank{{Country: "CZ", BankCode: "0100",
+		Name: "Komercni banka", BIC: "KOMBCZPP", Source: "CNB"}}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	to := NewMemoryStore()
+	copied, err := CopySources(ctx, from, to)
+	if err != nil {
+		t.Fatalf("CopySources returned %v", err)
+	}
+	if len(copied) != 2 {
+		t.Fatalf("copied %d sources, want 2", len(copied))
+	}
+	if to.Len() != from.Len() {
+		t.Errorf("target holds %d records, source %d", to.Len(), from.Len())
+	}
+
+	stats, _ := to.Stats(ctx)
+	var found bool
+	for _, src := range stats.Sources {
+		if src.Name == "CNB" {
+			found = true
+			// Provenance must survive the copy: the retrieval time is the
+			// original fetch, not the time of the copy, and the URL is kept.
+			if !src.RetrievedAt.Equal(czInfo.RetrievedAt) || src.URL != czInfo.URL {
+				t.Errorf("provenance changed in transit: %+v", src)
+			}
+			if src.RecordCount != 1 {
+				t.Errorf("RecordCount = %d, want 1", src.RecordCount)
+			}
+		}
+	}
+	if !found {
+		t.Error("the CZ source did not arrive")
+	}
+	if _, err := to.Find(ctx, Key{Country: "DE", BankCode: "50010517"}); err != nil {
+		t.Errorf("a German record did not arrive: %v", err)
+	}
+}
+
+func TestCopySourcesRefusesEmptySource(t *testing.T) {
+	from := NewMemoryStore()
+	// Metadata for a source that holds no records is a broken snapshot.
+	from.sources["ghost"] = SourceInfo{Country: "XX", Name: "ghost", RetrievedAt: time.Now()}
+	if _, err := CopySources(context.Background(), from, NewMemoryStore()); err == nil {
+		t.Error("CopySources copied a source with no records")
+	}
+}

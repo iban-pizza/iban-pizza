@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/netzfabrikcom/iban-pizza/bankdata"
+	"github.com/netzfabrikcom/iban-pizza/internal/embedded"
 	"github.com/netzfabrikcom/iban-pizza/internal/sources"
 )
 
@@ -18,8 +20,10 @@ func runImport(ctx context.Context, args []string) error {
 	var data dataSource
 	data.bind(fs)
 
-	country := fs.String("country", "", "ISO 3166-1 alpha-2 code of the file's country (required)")
-	file := fs.String("file", "", "path to the registry file to import (required)")
+	country := fs.String("country", "", "ISO 3166-1 alpha-2 code of the file's country")
+	file := fs.String("file", "", "path to the registry file to import")
+	snapshot := fs.String("snapshot", "",
+		`copy every source from a snapshot instead: a file path, or "embedded" for the one built into this binary`)
 	source := fs.String("source", "", "source name to record; defaults to the registry's name")
 	format := fs.String("format", "auto",
 		`"auto" uses the built in parser for the country, "generic" reads the documented CSV layout`)
@@ -30,8 +34,14 @@ func runImport(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if *snapshot != "" {
+		if *country != "" || *file != "" || *format != "auto" {
+			return fmt.Errorf("-snapshot cannot be combined with -country, -file or -format")
+		}
+		return importSnapshot(ctx, &data, *snapshot, *dryRun, *snapshotPath, newLogger(*logFormat, "info"))
+	}
 	if *country == "" || *file == "" {
-		return fmt.Errorf("both -country and -file are required")
+		return fmt.Errorf("both -country and -file are required (or use -snapshot)")
 	}
 	cc := strings.ToUpper(strings.TrimSpace(*country))
 	if len(cc) != 2 {
@@ -117,4 +127,64 @@ func fileTime(path string) time.Time {
 		return info.ModTime().UTC()
 	}
 	return time.Now().UTC()
+}
+
+// importSnapshot copies every source of a snapshot into the target store.
+//
+// With "embedded" this is the secure way to fill a database: the data was
+// fetched, tested and reviewed in the release pipeline and shipped inside the
+// binary, and the host running this never contacts a publisher. It is also
+// idempotent, so running it on every rollout keeps the database in step with
+// the image.
+func importSnapshot(ctx context.Context, data *dataSource, from string, dryRun bool, snapshotPath string, log *slog.Logger) error {
+	var (
+		src *bankdata.MemoryStore
+		err error
+	)
+	if from == "embedded" {
+		src, err = embedded.Load()
+		if err != nil {
+			return fmt.Errorf("load embedded snapshot: %w", err)
+		}
+	} else {
+		src, err = bankdata.LoadSnapshotFile(from)
+		if err != nil {
+			return fmt.Errorf("load %s: %w", from, err)
+		}
+	}
+
+	stats, err := src.Stats(ctx)
+	if err != nil {
+		return err
+	}
+	for _, s := range stats.Sources {
+		log.Info("snapshot source", "country", s.Country, "source", s.Name,
+			"records", s.RecordCount, "retrieved", s.RetrievedAt.Format("2006-01-02"))
+	}
+	if dryRun {
+		log.Info("dry run, nothing stored", "sources", len(stats.Sources), "records", stats.TotalRecords)
+		return nil
+	}
+
+	repo, writer, closeStore, err := data.openWritableStore(ctx, log)
+	if err != nil {
+		return err
+	}
+	defer closeStore()
+
+	copied, err := bankdata.CopySources(ctx, src, writer)
+	for _, c := range copied {
+		log.Info("stored", "country", c.Country, "source", c.Name, "records", c.RecordCount)
+	}
+	if err != nil {
+		return fmt.Errorf("copy snapshot: %w", err)
+	}
+
+	if snapshotPath != "" {
+		if err := bankdata.SaveSnapshotFile(ctx, snapshotPath, repo); err != nil {
+			return fmt.Errorf("write snapshot: %w", err)
+		}
+		log.Info("snapshot written", "path", snapshotPath)
+	}
+	return nil
 }
