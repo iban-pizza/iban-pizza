@@ -1,0 +1,465 @@
+openapi: 3.1.0
+info:
+  title: iban.pizza
+  version: "1.0.0"
+  summary: IBAN validation, bank lookup and SEPA scheme membership.
+  description: |
+    Two surfaces are served side by side.
+
+    The **v1** routes reproduce the openiban.com responses exactly, including
+    field names, message strings and two space indentation, so that an existing
+    client can change its base URL and nothing else.
+
+    The **v2** routes add what v1 has no room for: national account check digit
+    results, EPC scheme membership, bank logos, and the retrieval date of every
+    dataset the answer relied on.
+
+    Two properties of the data are worth reading before integrating:
+
+    - Scheme membership is recorded per institution, not per account. An
+      institution can be a scheme participant while not offering that product
+      to a given customer.
+    - A scheme status of `unknown` means the BIC is absent from the EPC
+      register. Many savings and cooperative banks are reachable through a
+      central institution without being listed individually, so `unknown` must
+      not be read as "not supported".
+  license:
+    name: MIT
+    url: https://github.com/netzfabrikcom/iban-pizza/blob/main/LICENSE
+
+servers:
+  - url: https://iban.pizza
+    description: Public instance
+  - url: http://localhost:8080
+    description: Local instance
+
+tags:
+  - name: v2
+    description: Current API.
+  - name: v1
+    description: Compatibility surface for openiban.com clients.
+  - name: operations
+    description: Health and description endpoints.
+
+paths:
+  /v2/iban/{iban}:
+    get:
+      tags: [v2]
+      summary: Validate an IBAN and describe its bank.
+      operationId: validateIBAN
+      parameters:
+        - name: iban
+          in: path
+          required: true
+          schema: { type: string, maxLength: 64 }
+          example: DE89370400440532013000
+      responses:
+        "200":
+          description: The validation result. A structurally invalid IBAN is also reported here, with `valid` false.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationResult" }
+        "400":
+          description: The input exceeds the maximum length.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v2/iban:batch:
+    post:
+      tags: [v2]
+      summary: Validate up to 100 IBANs in one request.
+      operationId: validateIBANBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ibans]
+              properties:
+                ibans:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { type: string }
+      responses:
+        "200":
+          description: One result per input, in the order submitted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/ValidationResult" }
+        "400":
+          description: The body is missing, malformed, empty or too large.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v2/banks:
+    get:
+      tags: [v2]
+      summary: Search banks.
+      operationId: searchBanks
+      parameters:
+        - { name: country, in: query, schema: { type: string, minLength: 2, maxLength: 2 }, example: DE }
+        - { name: bic, in: query, schema: { type: string }, description: Matches on prefix., example: COBA }
+        - { name: name, in: query, schema: { type: string }, description: Case insensitive substring. }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+      responses:
+        "200":
+          description: Matching banks, ordered by country and bank code.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  banks:
+                    type: array
+                    items: { $ref: "#/components/schemas/Bank" }
+
+  /v2/banks/{country}/{bankCode}:
+    get:
+      tags: [v2]
+      summary: Fetch one bank.
+      operationId: getBank
+      parameters:
+        - { name: country, in: path, required: true, schema: { type: string, minLength: 2, maxLength: 2 } }
+        - { name: bankCode, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The bank.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bank" }
+        "404":
+          description: No such bank.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v2/banks/{country}/{bankCode}/logo.svg:
+    get:
+      tags: [v2]
+      summary: Render the bank's monogram.
+      description: |
+        Returns a generated monogram built from the institution's own name and
+        a colour derived from its BIC, so the same bank always renders
+        identically. Bank logos are trademarks of their owners and no third
+        party artwork is served here by default.
+      operationId: getBankLogo
+      parameters:
+        - { name: country, in: path, required: true, schema: { type: string, minLength: 2, maxLength: 2 } }
+        - { name: bankCode, in: path, required: true, schema: { type: string } }
+        - { name: size, in: query, schema: { type: integer, minimum: 16, maximum: 512, default: 128 } }
+      responses:
+        "200":
+          description: An SVG document.
+          content:
+            image/svg+xml:
+              schema: { type: string }
+        "404":
+          description: No such bank.
+
+  /v2/countries:
+    get:
+      tags: [v2]
+      summary: List the countries in the IBAN registry.
+      operationId: listCountries
+      responses:
+        "200":
+          description: Every country, with its IBAN length, BBAN structure and whether bank data is loaded for it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  countries:
+                    type: array
+                    items: { $ref: "#/components/schemas/Country" }
+
+  /validate/{iban}:
+    get:
+      tags: [v1]
+      summary: Validate an IBAN, openiban.com compatible.
+      operationId: validateIBANV1
+      parameters:
+        - { name: iban, in: path, required: true, schema: { type: string } }
+        - name: validateBankCode
+          in: query
+          description: Accepts "1" or "true".
+          schema: { type: string }
+        - name: getBIC
+          in: query
+          description: Accepts "1" or "true".
+          schema: { type: string }
+      responses:
+        "200":
+          description: The upstream response shape, unchanged.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/V1Result" }
+
+  /countries:
+    get:
+      tags: [v1]
+      summary: Country name to country code map, openiban.com compatible.
+      operationId: listCountriesV1
+      responses:
+        "200":
+          description: A map of country name to ISO 3166-1 alpha-2 code.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: { type: string } }
+
+  /calculate/{countryCode}/{bankCode}/{accountNumber}:
+    get:
+      tags: [v1]
+      summary: Build an IBAN from its parts.
+      operationId: calculateIBAN
+      parameters:
+        - { name: countryCode, in: path, required: true, schema: { type: string } }
+        - { name: bankCode, in: path, required: true, schema: { type: string } }
+        - { name: accountNumber, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The calculated IBAN, or a message explaining why it could not be built.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      valid: { type: boolean, const: true }
+                      iban: { type: string }
+                  - type: object
+                    properties:
+                      valid: { type: boolean, const: false }
+                      message: { type: string }
+
+  /v2/calculate/{countryCode}/{bankCode}/{accountNumber}:
+    get:
+      tags: [v1]
+      summary: Build an IBAN and validate it, openiban.com compatible.
+      description: This route belongs to the compatibility surface despite its path, which the upstream service defined.
+      operationId: calculateAndValidateIBAN
+      parameters:
+        - { name: countryCode, in: path, required: true, schema: { type: string } }
+        - { name: bankCode, in: path, required: true, schema: { type: string } }
+        - { name: accountNumber, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The validation result for the calculated IBAN.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/V1Result" }
+
+  /healthz:
+    get:
+      tags: [operations]
+      summary: Liveness and data freshness.
+      description: |
+        Always returns 200 while the service can answer. Stale data is reported
+        in the body as `status: stale` rather than as a failure, so that a data
+        problem does not remove a working instance from a load balancer.
+      operationId: health
+      responses:
+        "200":
+          description: Service state and the age of every dataset.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /readyz:
+    get:
+      tags: [operations]
+      summary: Readiness.
+      operationId: ready
+      responses:
+        "200": { description: Bank data is loaded. }
+        "503": { description: No bank data is loaded. }
+
+  /openapi.yaml:
+    get:
+      tags: [operations]
+      summary: This document.
+      operationId: openapi
+      responses:
+        "200":
+          description: The API description.
+          content:
+            application/yaml:
+              schema: { type: string }
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+    Check:
+      type: object
+      description: |
+        One named check. `ok` is null when no statement could be made, which is
+        different from a failure and must not be rendered as one.
+      properties:
+        ok:
+          type: [boolean, "null"]
+        message: { type: string }
+        method:
+          type: string
+          description: The national check digit method identifier, where one applies.
+      required: [ok, message]
+
+    IBANParts:
+      type: object
+      properties:
+        input: { type: string }
+        formatted: { type: string, example: "DE89 3704 0044 0532 0130 00" }
+        countryCode: { type: string }
+        checkDigits: { type: string }
+        bankCode: { type: string }
+        branchCode: { type: string }
+        accountNumber: { type: string }
+
+    Logo:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [monogram, brand]
+        brand:
+          type: string
+          description: The institution group, when the BIC prefix identifies a single brand.
+        url: { type: string }
+
+    Bank:
+      type: object
+      properties:
+        country: { type: string }
+        bankCode: { type: string }
+        name: { type: string }
+        shortName: { type: string }
+        zip: { type: string }
+        city: { type: string }
+        bic: { type: string }
+        source:
+          type: string
+          description: The registry this record came from.
+        logo: { $ref: "#/components/schemas/Logo" }
+
+    Membership:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [participant, not_participant, left, unknown]
+          description: |
+            `participant`: listed for this scheme.
+            `not_participant`: present in the register for other schemes but not this one, which is a reliable negative.
+            `left`: the register records a leaving date.
+            `unknown`: the BIC is absent from the register entirely. Indirect reachability through a central institution is common, so this is not a negative.
+        readinessDate: { type: string }
+        leavingDate: { type: string }
+        role:
+          type: string
+          description: Populated for Verification of Payee.
+
+    Schemes:
+      type: object
+      properties:
+        level:
+          type: string
+          const: institution
+          description: The statuses describe the institution, not an individual account.
+        schemes:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/Membership" }
+        source: { type: string }
+        asOf: { type: string, format: date }
+        note: { type: string }
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: True when no check failed. Unchecked items do not count against it.
+        iban: { $ref: "#/components/schemas/IBANParts" }
+        checks:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/Check" }
+        bank: { $ref: "#/components/schemas/Bank" }
+        schemes: { $ref: "#/components/schemas/Schemes" }
+        dataAsOf:
+          type: object
+          additionalProperties: { type: string, format: date }
+          description: Retrieval date per data source, so an answer can be dated.
+
+    Country:
+      type: object
+      properties:
+        code: { type: string }
+        name: { type: string }
+        ibanLength: { type: integer }
+        bbanStructure:
+          type: string
+          description: SWIFT registry notation, for example "8!n10!n". Absent when only the length is known.
+        hasBankData:
+          type: boolean
+          description: Whether a bank directory is loaded for this country.
+
+    V1Result:
+      type: object
+      description: The openiban.com response shape, reproduced unchanged.
+      properties:
+        valid: { type: boolean }
+        messages:
+          type: array
+          items: { type: string }
+        iban: { type: string }
+        bankData:
+          type: object
+          properties:
+            bankCode: { type: string }
+            name: { type: string }
+            zip: { type: string }
+            city: { type: string }
+            bic: { type: string }
+        checkResults:
+          type: object
+          additionalProperties: { type: boolean }
+
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, stale, degraded]
+        version: { type: string }
+        uptime: { type: string }
+        records: { type: integer }
+        stale: { type: boolean }
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              country: { type: string }
+              name: { type: string }
+              retrievedAt: { type: string, format: date-time }
+              ageDays: { type: integer }
+              records: { type: integer }
+              stale: { type: boolean }
+        schemes:
+          type: object
+          properties:
+            institutions: { type: integer }
+            asOf: { type: string, format: date }

@@ -1,0 +1,77 @@
+name: Refresh bank data
+
+# The upstream project's data froze in 2019 and nobody noticed, because
+# refreshing it was a manual step that simply stopped happening. This job makes
+# the refresh visible: it opens a pull request, so a stale dataset shows up as
+# an unmerged PR rather than as silence.
+on:
+  schedule:
+    # Shortly after each quarter starts, which is when the German register is
+    # republished.
+    - cron: '0 6 5 1,4,7,10 *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    name: Fetch and open a pull request
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Refresh the snapshot and the scheme register
+        id: refresh
+        run: |
+          go run ./cmd/openiban update \
+            --write-snapshot internal/embedded/snapshot.jsonl.gz \
+            --scheme-dir data/schemes \
+            --log-format text 2>&1 | tee refresh.log
+
+          {
+            echo 'summary<<EOF'
+            grep -E 'msg=(updated|"scheme downloaded")' refresh.log || true
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Test against the refreshed data
+        run: go test ./... -count=1
+
+      - name: Verify the service starts with the new snapshot
+        run: |
+          go build -o /tmp/openiban ./cmd/openiban
+          /tmp/openiban serve -addr 127.0.0.1:8080 -log-format text &
+          pid=$!
+          trap 'kill $pid' EXIT
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8080/readyz >/dev/null && break
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:8080/readyz
+
+      - name: Open a pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: data/refresh
+          title: 'Refresh bank data from the official registries'
+          commit-message: 'Refresh bank data snapshot and EPC scheme register'
+          delete-branch: true
+          body: |
+            Automated refresh of the embedded bank data snapshot and the EPC
+            scheme register.
+
+            ```
+            ${{ steps.refresh.outputs.summary }}
+            ```
+
+            The full test suite and a start of the service both ran against
+            this data before the pull request was opened.
+
+            If this pull request stays open, the shipped data is going stale.

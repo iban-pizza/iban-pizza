@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -race -count=1 -coverprofile=coverage.out
+
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1
+
+  vulncheck:
+    name: Vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Build
+        run: CGO_ENABLED=0 go build -trimpath -o /tmp/openiban ./cmd/openiban
+
+      # The binary has to answer correctly with no configuration at all,
+      # because that is the whole point of the embedded snapshot.
+      - name: Smoke test the zero configuration start
+        run: |
+          /tmp/openiban serve -addr 127.0.0.1:8080 -log-format text &
+          pid=$!
+          trap 'kill $pid' EXIT
+
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8080/healthz >/dev/null && break
+            sleep 0.5
+          done
+
+          echo "Health:"
+          curl -sf http://127.0.0.1:8080/healthz | head -c 400
+          echo
+
+          echo "Readiness:"
+          curl -sf http://127.0.0.1:8080/readyz
+
+          echo "A known IBAN must validate:"
+          curl -sf "http://127.0.0.1:8080/validate/DE89370400440532013000?getBIC=true" \
+            | grep -q '"bic": "COBADEFFXXX"'
+
+          echo "The v2 surface must answer:"
+          curl -sf http://127.0.0.1:8080/v2/iban/DE89370400440532013000 \
+            | grep -q '"valid":true'
+
+          echo "The spec must be served:"
+          curl -sf http://127.0.0.1:8080/openapi.yaml | head -1 | grep -q '^openapi:'
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: iban-pizza:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run the image
+        run: |
+          docker run -d --name iban -p 8080:8080 iban-pizza:ci
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8080/healthz >/dev/null && break
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:8080/readyz
+          docker rm -f iban

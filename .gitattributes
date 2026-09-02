@@ -1,0 +1,5 @@
+# The snapshot is generated and compressed. Marking it binary keeps diffs
+# readable and prevents any line ending translation from corrupting it.
+internal/embedded/snapshot.jsonl.gz binary
+internal/checkdigit/testdata/vectors.tsv text eol=lf
+internal/sources/testdata/* -text

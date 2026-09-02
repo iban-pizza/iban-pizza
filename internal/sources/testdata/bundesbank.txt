@@ -1,0 +1,6 @@
+100000001Bundesbank                                                10591Berlin                             BBk Berlin                 20100MARKDEF110009011380U000000000
+500105171ING-DiBa                                                  60628Frankfurt am Main                  ING-DiBa Frankfurt am Main 29165INGDDEFFXXXC1010750U000000000
+370400441Commerzbank                                               50447Köln                               Commerzbank Köln           24370COBADEFFXXX13006143U000000000
+100140011Swan Zweigniederlassung Deutschland (Geschäftsfeld)       10178Berlin                             Swan Zndl Deutschland           SWNBDEBBXXX09057733U000000000
+100305001M.M. Warburg & Co (vormals Bankhaus Löbbecke)             20095Hamburg                            M.M. Warburg (Löbbecke)    26225LOEBDEBBXXX09043961U000000000
+100208902UniCredit Bank - HypoVereinsbank                          14776Brandenburg an der Havel           UniCredit Bank-HypoVereinbk22014HYVEDEMM48899049746U000000000

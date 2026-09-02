@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iban.pizza</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfa; --fg: #1a1a19; --muted: #6b6b66; --line: #e2e2dd;
+    --card: #ffffff; --ok: #1f6b3d; --bad: #a3301f; --none: #7a6a2f;
+    --accent: #1f4e79;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a; --fg: #e8e8e4; --muted: #9a9a93; --line: #2c2c33;
+      --card: #1e1e23; --ok: #6fbf8b; --bad: #e4897c; --none: #d6c07a;
+      --accent: #7fb0e0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 2rem; }
+  form { display: flex; gap: .5rem; flex-wrap: wrap; }
+  input {
+    flex: 1 1 20rem; padding: .7rem .85rem; font: inherit;
+    font-variant-numeric: tabular-nums; letter-spacing: .04em;
+    border: 1px solid var(--line); border-radius: .5rem;
+    background: var(--card); color: var(--fg);
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    padding: .7rem 1.2rem; font: inherit; font-weight: 600; cursor: pointer;
+    border: 0; border-radius: .5rem; background: var(--accent); color: #fff;
+  }
+  button:disabled { opacity: .55; cursor: default; }
+  .card {
+    margin-top: 1.5rem; padding: 1.25rem; background: var(--card);
+    border: 1px solid var(--line); border-radius: .75rem;
+  }
+  .verdict { display: flex; align-items: center; gap: .6rem; font-weight: 600; font-size: 1.05rem; }
+  .dot { width: .7rem; height: .7rem; border-radius: 50%; flex: none; }
+  ul { list-style: none; margin: 1rem 0 0; padding: 0; }
+  li { display: flex; gap: .6rem; padding: .35rem 0; align-items: baseline; }
+  .mark { font-weight: 700; flex: none; width: 1.1rem; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .none { color: var(--none); }
+  .bank { display: flex; gap: .9rem; align-items: center; margin-top: 1.25rem;
+          padding-top: 1.25rem; border-top: 1px solid var(--line); }
+  .bank img { width: 46px; height: 46px; border-radius: .5rem; flex: none; }
+  .bank b { display: block; }
+  .bank span { color: var(--muted); font-size: .9rem; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1.25rem; font-size: .92rem; }
+  th, td { text-align: left; padding: .4rem 0; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  .note { color: var(--muted); font-size: .82rem; margin-top: 1rem; line-height: 1.5; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+  footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>iban.pizza</h1>
+  <p class="sub">IBAN validation, bank lookup and SEPA scheme membership.</p>
+
+  <form id="f">
+    <input id="q" placeholder="DE89 3704 0044 0532 0130 00" autocomplete="off"
+           spellcheck="false" aria-label="IBAN">
+    <button id="go">Check</button>
+  </form>
+
+  <div id="out"></div>
+
+  <footer>
+    <a href="/openapi.yaml">API description</a> &middot;
+    <a href="/healthz">Service health</a>
+  </footer>
+</div>
+
+<script>
+const f = document.getElementById('f');
+const q = document.getElementById('q');
+const go = document.getElementById('go');
+const out = document.getElementById('out');
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const ORDER = ['length', 'bankCode', 'accountNumber', 'ibanChecksum'];
+const SCHEME_LABEL = {
+  sct: 'SEPA Credit Transfer',
+  sctInst: 'SEPA Instant Credit Transfer',
+  sddCore: 'SEPA Direct Debit (core)',
+  sddB2B: 'SEPA Direct Debit (B2B)',
+  octInst: 'One-Leg Out Instant',
+  vop: 'Verification of Payee'
+};
+const STATUS_LABEL = {
+  participant: 'supported',
+  not_participant: 'not supported',
+  left: 'left the scheme',
+  unknown: 'not listed'
+};
+
+f.addEventListener('submit', async e => {
+  e.preventDefault();
+  const value = q.value.trim();
+  if (!value) return;
+
+  go.disabled = true;
+  out.innerHTML = '<div class="card">Checking...</div>';
+  try {
+    const r = await fetch('/v2/iban/' + encodeURIComponent(value.replace(/\s+/g, '')));
+    render(await r.json());
+  } catch (err) {
+    out.innerHTML = '<div class="card">Could not reach the service.</div>';
+  } finally {
+    go.disabled = false;
+  }
+});
+
+function render(res) {
+  const colour = res.valid ? 'var(--ok)' : 'var(--bad)';
+  let html = '<div class="card">';
+  html += `<div class="verdict"><span class="dot" style="background:${colour}"></span>`;
+  html += res.valid ? 'This IBAN is correct' : 'This IBAN is not correct';
+  html += '</div>';
+
+  if (res.iban && res.iban.formatted) {
+    html += `<p style="margin:.5rem 0 0"><code>${esc(res.iban.formatted)}</code></p>`;
+  }
+
+  const checks = res.checks || {};
+  const names = ORDER.filter(n => n in checks).concat(
+    Object.keys(checks).filter(n => !ORDER.includes(n)));
+
+  if (names.length) {
+    html += '<ul>';
+    for (const name of names) {
+      const c = checks[name];
+      // ok is null when nothing could be checked. That is deliberately shown
+      // as its own state rather than as a failure.
+      const cls = c.ok === true ? 'ok' : c.ok === false ? 'bad' : 'none';
+      const mark = c.ok === true ? '+' : c.ok === false ? 'x' : '?';
+      html += `<li><span class="mark ${cls}">${mark}</span><span>${esc(c.message)}</span></li>`;
+    }
+    html += '</ul>';
+  }
+
+  if (res.bank) {
+    const b = res.bank;
+    const logo = b.logo && b.logo.url ? esc(b.logo.url) : '';
+    html += '<div class="bank">';
+    if (logo) html += `<img src="${logo}" alt="">`;
+    html += `<div><b>${esc(b.name)}</b><span>`;
+    html += [b.bic, [b.zip, b.city].filter(Boolean).join(' ')].filter(Boolean).map(esc).join(' &middot; ');
+    html += '</span></div></div>';
+  }
+
+  if (res.schemes && res.schemes.schemes) {
+    html += '<table><tr><th>Scheme</th><th>Institution</th></tr>';
+    for (const [key, label] of Object.entries(SCHEME_LABEL)) {
+      const m = res.schemes.schemes[key];
+      if (!m) continue;
+      const cls = m.status === 'participant' ? 'ok'
+                : m.status === 'unknown' ? 'none' : 'bad';
+      html += `<tr><td>${esc(label)}</td><td class="${cls}">${esc(STATUS_LABEL[m.status] || m.status)}</td></tr>`;
+    }
+    html += '</table>';
+    html += `<p class="note">Scheme membership is recorded per institution, not per account,
+      so a bank can be a participant without offering the product to every customer.
+      "Not listed" means the BIC is absent from the EPC register; many savings and
+      cooperative banks are reachable through a central institution without appearing
+      there, so it does not mean unsupported. Register as of ${esc(res.schemes.asOf || 'unknown')}.</p>`;
+  }
+
+  if (res.dataAsOf) {
+    const parts = Object.entries(res.dataAsOf).map(([k, v]) => `${esc(k)} ${esc(v)}`);
+    html += `<p class="note">Data retrieved: ${parts.join(', ')}.</p>`;
+  }
+
+  html += '</div>';
+  out.innerHTML = html;
+}
+</script>
+</body>
+</html>
