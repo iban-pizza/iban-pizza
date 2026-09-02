@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" width="520" height="120" role="img" aria-label="iban.pizza">
+  <rect width="120" height="120" rx="20" fill="#0a0a0a"/>
+  <path d="M22 22H60V60H22ZM22 60H60V98H22ZM60 60H98V98H60ZM70 12H108V50H70Z" fill="#fafafa"/>
+  <text x="150" y="76" font-family="-apple-system, BlinkMacSystemFont, Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="58" font-weight="500" letter-spacing="-1.5" fill="#fafafa">iban.pizza</text>
+</svg>

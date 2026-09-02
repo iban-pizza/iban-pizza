@@ -1,7 +1,29 @@
-# iban.pizza
+<br>
 
-IBAN validation, bank lookup and SEPA scheme membership, served as a single
-static binary with no runtime dependencies.
+<p align="center">
+  <a href="https://iban.pizza">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/brand/wordmark-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset=".github/brand/wordmark-light.svg">
+      <img alt="iban.pizza" src=".github/brand/wordmark-light.svg" height="72">
+    </picture>
+  </a>
+</p>
+
+<h3 align="center">IBAN validation, bank lookup and SEPA schemes as one binary</h3>
+
+<p align="center">
+  Bank data compiled in. No database, no configuration. Self-host with Docker or a single static binary.
+</p>
+
+<p align="center">
+  <a href="https://iban.pizza"><strong>Website</strong></a> &middot;
+  <a href="docs/deployment.md"><strong>Deploy</strong></a> &middot;
+  <a href="internal/api/openapi.yaml"><strong>API</strong></a> &middot;
+  <a href="https://github.com/NETZFABRIKCOM/iban-pizza/releases"><strong>Releases</strong></a>
+</p>
+
+<br>
 
 A ground up rewrite of the [goiban](https://github.com/apilayer/goiban) family
 of projects, whose last release was in 2019.
