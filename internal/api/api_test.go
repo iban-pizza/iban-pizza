@@ -583,3 +583,64 @@ func TestUnknownRouteIs404(t *testing.T) {
 		t.Errorf("unknown route returned %d", rec.Code)
 	}
 }
+
+// TestClientIPIgnoresHeadersByDefault guards the default: a client that sends
+// a forwarded header must not be able to choose the address it is limited on.
+func TestClientIPIgnoresHeadersByDefault(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.RemoteAddr = "203.0.113.5:4321"
+	req.Header.Set("X-Forwarded-For", "10.0.0.1")
+	req.Header.Set("X-Real-IP", "10.0.0.2")
+
+	if got := clientIP(req, ""); got != "203.0.113.5" {
+		t.Errorf("clientIP = %q, want the socket address", got)
+	}
+}
+
+func TestClientIPUsesOnlyTheTrustedHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.RemoteAddr = "198.51.100.9:1"
+	req.Header.Set("X-Real-IP", "203.0.113.77")
+	req.Header.Set("X-Forwarded-For", "10.9.9.9")
+
+	// The named header wins, the other forwarded header is ignored.
+	if got := clientIP(req, "X-Real-IP"); got != "203.0.113.77" {
+		t.Errorf("clientIP = %q, want the trusted header value", got)
+	}
+	// Only the first value of a list counts.
+	req.Header.Set("X-Forwarded-For", "203.0.113.1, 10.0.0.1, 10.0.0.2")
+	if got := clientIP(req, "X-Forwarded-For"); got != "203.0.113.1" {
+		t.Errorf("clientIP = %q, want the first listed address", got)
+	}
+	// A trusted header that is absent falls back to the socket.
+	req.Header.Del("X-Real-IP")
+	if got := clientIP(req, "X-Real-IP"); got != "198.51.100.9" {
+		t.Errorf("clientIP = %q, want the socket address as fallback", got)
+	}
+}
+
+// TestRateLimitBehindProxySeparatesClients is the case the setting exists
+// for: two clients behind one proxy share a socket address and must still be
+// limited separately.
+func TestRateLimitBehindProxySeparatesClients(t *testing.T) {
+	h := testServer(t, func(c *Config) {
+		c.RateLimit = 2
+		c.TrustedProxyHeader = "x-real-ip"
+	})
+	send := func(ip string) int {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		req.RemoteAddr = "10.0.0.1:1" // the proxy
+		req.Header.Set("x-real-ip", ip)
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	send("203.0.113.1")
+	send("203.0.113.1")
+	if got := send("203.0.113.1"); got != http.StatusTooManyRequests {
+		t.Errorf("third request from one client returned %d, want 429", got)
+	}
+	if got := send("203.0.113.2"); got != http.StatusOK {
+		t.Errorf("a different client behind the same proxy was limited: %d", got)
+	}
+}

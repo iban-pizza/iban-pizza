@@ -27,6 +27,8 @@ func runServe(ctx context.Context, args []string) error {
 		`comma separated allowed origins, or "*" for any (default: no cross origin access)`)
 	rateLimit := fs.Int("rate-limit", envInt("IBAN_PIZZA_RATE_LIMIT", 600),
 		"requests per minute per client address, 0 disables the limit")
+	trustedProxyHeader := fs.String("trusted-proxy-header", envOr("IBAN_PIZZA_TRUSTED_PROXY_HEADER", ""),
+		"header carrying the client address behind a proxy you control, for example x-real-ip (default: socket address)")
 	staleAfter := fs.Duration("stale-after", envDuration("IBAN_PIZZA_STALE_AFTER", api.DefaultStaleAfter),
 		"age at which data is reported as stale")
 	schemeFile := fs.String("scheme-file", envOr("IBAN_PIZZA_SCHEME_FILE", ""),
@@ -71,14 +73,15 @@ func runServe(ctx context.Context, args []string) error {
 	}
 
 	srv := api.New(api.Config{
-		Repo:           repo,
-		Schemes:        schemes,
-		Logos:          logo.New(*baseURL),
-		Version:        version,
-		AllowedOrigins: splitOrigins(*origins),
-		RateLimit:      *rateLimit,
-		StaleAfter:     *staleAfter,
-		Logger:         log,
+		Repo:               repo,
+		Schemes:            schemes,
+		Logos:              logo.New(*baseURL),
+		Version:            version,
+		AllowedOrigins:     splitOrigins(*origins),
+		RateLimit:          *rateLimit,
+		TrustedProxyHeader: *trustedProxyHeader,
+		StaleAfter:         *staleAfter,
+		Logger:             log,
 	})
 
 	httpServer := &http.Server{

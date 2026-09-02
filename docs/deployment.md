@@ -95,6 +95,7 @@ unit file, a container and a shell all configure it the same way.
 | `-addr` | `IBAN_PIZZA_ADDR` | `:8080` | listen address |
 | `-cors-origins` | `IBAN_PIZZA_CORS_ORIGINS` | none | comma separated origins, or `*` |
 | `-rate-limit` | `IBAN_PIZZA_RATE_LIMIT` | 600 | requests per minute per client, 0 disables |
+| `-trusted-proxy-header` | `IBAN_PIZZA_TRUSTED_PROXY_HEADER` | none | header carrying the client address behind a proxy you control |
 | `-data-file` | `IBAN_PIZZA_DATA_FILE` | | snapshot file, overrides the embedded one |
 | `-database-url` | `IBAN_PIZZA_DATABASE_URL` | | PostgreSQL connection string |
 | `-scheme-file` | `IBAN_PIZZA_SCHEME_FILE` | | directory of EPC exports |
@@ -222,6 +223,25 @@ every image rollout and the database matches the image; nothing in
 production ever talks to a registry. Fetching in cluster with `update` is
 possible and documented in both manifests, and it is a deliberate trade of
 egress for freshness rather than the default.
+
+## Behind iban.pizza: the container on any host, no open port
+
+The edge Worker in the website repository serves the site and forwards the
+API paths to wherever the service runs. `deploy/cloudflare-tunnel/` holds a
+Compose file that runs the container next to `cloudflared`, which opens an
+outbound tunnel to Cloudflare and needs no inbound port on the host:
+
+```sh
+TUNNEL_TOKEN=... docker compose -f deploy/cloudflare-tunnel/compose.yaml up -d
+```
+
+Create the tunnel once in the Cloudflare dashboard, point its public hostname
+(for example `api.iban.pizza`) at `http://iban-pizza:8080`, and set that
+hostname as `API_ORIGIN` on the Worker. Behind a proxy every request arrives
+from the proxy's address, so the service is told which header carries the
+real client with `-trusted-proxy-header x-real-ip`; the Worker sets exactly
+that header. Do not set it when clients connect directly, because anyone can
+send the header themselves.
 
 ## Keeping the data current
 

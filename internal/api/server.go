@@ -41,6 +41,16 @@ type Config struct {
 	// address. Zero disables limiting.
 	RateLimit int
 
+	// TrustedProxyHeader names a request header to read the client address
+	// from, for deployments behind a reverse proxy or tunnel. Empty means the
+	// socket address is used, which is correct when clients connect directly.
+	//
+	// Set this only when a proxy you control sets the header on every
+	// request, because a client can send the header itself. Behind Cloudflare
+	// the edge Worker sets x-real-ip; behind nginx it is typically
+	// X-Real-IP or X-Forwarded-For.
+	TrustedProxyHeader string
+
 	// StaleAfter is how old the newest data may get before health reports the
 	// dataset as stale. Zero uses DefaultStaleAfter.
 	StaleAfter time.Duration
@@ -102,7 +112,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /", s.handleWeb)
 
 	var h http.Handler = mux
-	h = withRateLimit(h, s.cfg.RateLimit)
+	h = withRateLimit(h, s.cfg.RateLimit, s.cfg.TrustedProxyHeader)
 	h = withCORS(h, s.cfg.AllowedOrigins)
 	h = withRequestLimits(h)
 	h = withRecovery(h, s.cfg.Logger)

@@ -1,0 +1,38 @@
+# The service behind iban.pizza, on any host, with no open inbound port.
+#
+# cloudflared opens an outbound connection to Cloudflare and exposes the
+# service on a hostname you choose in the tunnel's configuration, for
+# example api.iban.pizza. The edge Worker in the website repository forwards
+# the API paths of iban.pizza to that hostname, so the site and the API share
+# one origin.
+#
+#     TUNNEL_TOKEN=... docker compose -f deploy/cloudflare-tunnel/compose.yaml up -d
+#
+# Create the tunnel once in the Cloudflare dashboard (Zero Trust, Networks,
+# Tunnels), point its public hostname at http://iban-pizza:8080, and copy the
+# token it shows. The token is the only secret and never needs to change when
+# the image is updated.
+
+services:
+  iban-pizza:
+    image: ghcr.io/netzfabrikcom/iban-pizza:0.1.0
+    # Not published on the host. Only cloudflared, on the same network, can
+    # reach it.
+    expose:
+      - "8080"
+    environment:
+      IBAN_PIZZA_LOG_FORMAT: json
+      # The Worker forwards the client address in x-real-ip; the service rate
+      # limits per address, so without this every visitor would share the
+      # tunnel's address and one limit.
+      IBAN_PIZZA_TRUSTED_PROXY_HEADER: x-real-ip
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN to the token from the Cloudflare dashboard}
+    depends_on:
+      - iban-pizza
+    restart: unless-stopped

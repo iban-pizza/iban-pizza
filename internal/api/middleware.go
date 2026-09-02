@@ -157,14 +157,18 @@ func (l *limiter) allow(key string, now time.Time) bool {
 }
 
 // withRateLimit limits requests per client address per minute.
-func withRateLimit(next http.Handler, perMin int) http.Handler {
+//
+// trustedHeader, when set, names the header that carries the real client
+// address. Behind a proxy every request arrives from the proxy's own address,
+// so without it all clients would share one limit.
+func withRateLimit(next http.Handler, perMin int, trustedHeader string) http.Handler {
 	if perMin <= 0 {
 		return next
 	}
 	l := newLimiter(perMin)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !l.allow(clientIP(r), time.Now()) {
+		if !l.allow(clientIP(r, trustedHeader), time.Now()) {
 			w.Header().Set("Retry-After", "60")
 			writeJSON(w, http.StatusTooManyRequests, errorBody{Error: "rate limit exceeded"})
 			return
@@ -175,10 +179,20 @@ func withRateLimit(next http.Handler, perMin int) http.Handler {
 
 // clientIP returns the address to rate limit on.
 //
-// Forwarded headers are not trusted: anyone can set them, so honouring them
-// without knowing the proxy in front would let a caller bypass the limit by
-// inventing an address.
-func clientIP(r *http.Request) string {
+// Forwarded headers are not trusted by default: anyone can set them, so
+// honouring them without knowing the proxy in front would let a caller bypass
+// the limit by inventing an address. Only the one header the operator has
+// named is read, and only its first value, which is the client as seen by the
+// nearest proxy in the X-Forwarded-For convention.
+func clientIP(r *http.Request, trustedHeader string) string {
+	if trustedHeader != "" {
+		if v := r.Header.Get(trustedHeader); v != "" {
+			first, _, _ := strings.Cut(v, ",")
+			if ip := strings.TrimSpace(first); ip != "" {
+				return ip
+			}
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return strings.TrimSpace(r.RemoteAddr)
