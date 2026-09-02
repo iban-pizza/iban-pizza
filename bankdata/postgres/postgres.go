@@ -225,11 +225,33 @@ func (s *Store) Replace(ctx context.Context, info bankdata.SourceInfo, banks []b
 	}
 
 	rowsIn := make([][]any, 0, len(banks))
+	countries := make([]string, 0, len(banks))
+	codes := make([]string, 0, len(banks))
 	for _, b := range banks {
+		country := strings.ToUpper(b.Country)
 		rowsIn = append(rowsIn, []any{
-			strings.ToUpper(b.Country), b.BankCode, b.Name, b.ShortName,
+			country, b.BankCode, b.Name, b.ShortName,
 			b.Zip, b.City, b.BIC, b.CheckAlgo, info.Name,
 		})
+		countries = append(countries, country)
+		codes = append(codes, b.BankCode)
+	}
+
+	// Clearing by source is not enough on its own. The primary key is
+	// (country, bank_code), so a record that used to belong to a differently
+	// named source still occupies the row and the copy below would fail on a
+	// duplicate key. That happens for real whenever a source is renamed, and
+	// it would leave every later update broken. Removing the incoming keys
+	// first makes the operation idempotent and matches how the in memory
+	// store behaves, which the two backends are expected to agree on.
+	if len(rowsIn) > 0 {
+		if _, err := tx.Exec(ctx, `
+            DELETE FROM bank
+            WHERE (country, bank_code) IN (
+                SELECT * FROM unnest($1::text[], $2::text[])
+            )`, countries, codes); err != nil {
+			return fmt.Errorf("clear incoming keys: %w", err)
+		}
 	}
 	if _, err := tx.CopyFrom(ctx,
 		pgx.Identifier{"bank"},

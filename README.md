@@ -117,6 +117,63 @@ or LEI and enrich the answer, but carry no national bank codes and cannot
 replace those registries. Countries without a loaded registry still get full
 structural IBAN validation.
 
+### There is no separate loader
+
+The upstream split the work across four repositories, so a deployment meant
+running `goiban-service`, populating a MySQL database with `goiban-data-loader`
+as a second program, and keeping both in step. All four collapsed into this one
+repository, and the loader became a subcommand of the same binary.
+
+| Upstream repository | Here |
+|---|---|
+| `goiban` | `iban/`, `internal/checkdigit/` |
+| `goiban-data` | `bankdata/`, rewritten because the original carries no licence |
+| `goiban-data-loader` | `internal/sources/` plus `openiban update` |
+| `goiban-service` | `internal/api/` plus `openiban serve` |
+
+### Three ways data gets in
+
+**1. Do nothing.** A snapshot of every registry is compiled into the binary,
+so `openiban serve` answers immediately. The whole dataset is about 110 KB
+compressed for 4,423 institutions. This is the default and needs no network, no
+file and no database.
+
+**2. Refresh into a file**, when data should be newer than the binary:
+
+```sh
+openiban update --write-snapshot /var/lib/openiban/data.gz
+openiban serve  -data-file /var/lib/openiban/data.gz
+```
+
+No rebuild is involved. `--countries DE,AT` refreshes a subset, and `--dry-run`
+downloads and parses without storing, which is the safe way to check whether a
+registry has changed its format.
+
+**3. Refresh into PostgreSQL**, for central maintenance across instances:
+
+```sh
+openiban update -database-url postgres://user:pass@host/iban
+openiban serve  -database-url postgres://user:pass@host/iban
+```
+
+The schema is created on connect, so an empty database is enough to start.
+
+In every case `openiban update` resolves the download links from the
+publishers' pages at run time, refuses to replace existing data when a download
+or parse fails, and swaps one country at a time so a broken registry cannot
+take the others down with it.
+
+To refresh the snapshot that ships inside the binary, write it back to its
+source location and rebuild:
+
+```sh
+make update    # writes internal/embedded/snapshot.jsonl.gz
+make build
+```
+
+The scheduled `data-refresh` workflow does exactly this every quarter and opens
+a pull request with the result.
+
 ## Running it
 
 ### Container
