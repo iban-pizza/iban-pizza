@@ -226,10 +226,16 @@ egress for freshness rather than the default.
 
 ## Behind iban.pizza: the container on any host, no open port
 
-The edge Worker in the website repository serves the site and forwards the
-API paths to wherever the service runs. `deploy/cloudflare-tunnel/` holds a
-Compose file that runs the container next to `cloudflared`, which opens an
-outbound tunnel to Cloudflare and needs no inbound port on the host:
+iban.pizza itself is a Next.js site on Vercel; the domain stays at Cloudflare
+for DNS and points at Vercel. The site rewrites the API paths (`/v2/*`,
+`/validate/*`, `/calculate/*`, `/countries`, `/healthz`, `/readyz`,
+`/openapi.yaml`) to wherever the service runs, so the page and the API share
+one origin and the demo on the page needs no CORS.
+
+The service runs on any host behind a Cloudflare Tunnel.
+`deploy/cloudflare-tunnel/` holds a Compose file that runs the container next
+to `cloudflared`, which opens an outbound connection to Cloudflare and needs
+no inbound port on the host:
 
 ```sh
 TUNNEL_TOKEN=... docker compose -f deploy/cloudflare-tunnel/compose.yaml up -d
@@ -237,11 +243,11 @@ TUNNEL_TOKEN=... docker compose -f deploy/cloudflare-tunnel/compose.yaml up -d
 
 Create the tunnel once in the Cloudflare dashboard, point its public hostname
 (for example `api.iban.pizza`) at `http://iban-pizza:8080`, and set that
-hostname as `API_ORIGIN` on the Worker. Behind a proxy every request arrives
-from the proxy's address, so the service is told which header carries the
-real client with `-trusted-proxy-header x-real-ip`; the Worker sets exactly
-that header. Do not set it when clients connect directly, because anyone can
-send the header themselves.
+hostname as `API_ORIGIN` on the Vercel project. Behind a proxy every request
+arrives from the proxy's address, so the service is told which header carries
+the real client with `-trusted-proxy-header`; the Compose file sets it. Do not
+set it when clients connect directly, because anyone can send the header
+themselves.
 
 ## Keeping the data current
 
