@@ -102,6 +102,23 @@ The image is built `FROM scratch`: the binary, the certificate roots for
 `openiban update`, and nothing else. No shell, no package manager, no libc. It
 runs as uid 65534.
 
+### While the repository is private
+
+A private repository publishes a private image. Pulling it needs a GitHub
+token with the `read:packages` scope, and a `docker login`:
+
+```sh
+gh auth refresh -h github.com -s read:packages
+gh auth token | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+docker pull ghcr.io/netzfabrikcom/iban-pizza:0.1.0
+```
+
+The `repo` scope alone is not enough, even for a member of the organisation;
+the pull is refused with `denied` until `read:packages` is present. The
+released binaries have no such restriction for anyone who can see the
+repository, which makes the binary the simpler start while the repository is
+private. Once it is public, the image pulls without any login.
+
 With Compose, the repository carries two files:
 
 ```sh

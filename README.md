@@ -14,6 +14,10 @@ curl http://localhost:8080/v2/iban/DE89370400440532013000
 No database, no data directory, no configuration. The bank data is compiled
 into the binary, so nothing has to be downloaded before the first request.
 
+While this repository is private, its image is private too and `docker pull`
+needs a login with the `read:packages` scope; the released binaries do not. See
+[docs/deployment.md](docs/deployment.md) for both.
+
 ## Getting started
 
 **[docs/deployment.md](docs/deployment.md)** covers every way to run it:
