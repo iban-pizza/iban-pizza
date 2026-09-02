@@ -1,0 +1,40 @@
+{
+  "name": "iban-pizza",
+  "version": "0.1.0",
+  "description": "Client for the iban.pizza API: IBAN validation, bank lookup and SEPA scheme membership.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NETZFABRIKCOM/iban-pizza",
+    "directory": "clients/js"
+  },
+  "homepage": "https://iban.pizza",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "types": "openapi-typescript ../../internal/api/openapi.yaml -o src/openapi.d.ts",
+    "build": "npm run types && tsc -p tsconfig.json && cp src/openapi.d.ts dist/openapi.d.ts",
+    "test": "npm run types && vitest run",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7",
+    "typescript": "^5",
+    "vitest": "^3"
+  }
+}

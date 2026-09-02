@@ -295,6 +295,35 @@ Bundesbank path carries a content hash that changes with every quarterly
 release. `--dry-run` downloads and parses without storing, and `--countries DE`
 refreshes one registry.
 
+## Client libraries
+
+Two official clients live in this repository and are tested in CI against a
+service built from the same commit, so an API change that breaks a client
+fails here rather than at a user.
+
+| Language | Package | Where |
+|---|---|---|
+| JavaScript / TypeScript | `npm install iban-pizza` | [`clients/js`](clients/js) |
+| Python | `pip install iban-pizza` | [`clients/python`](clients/python) |
+
+Both are thin: no runtime dependencies, the platform's own HTTP, and one
+method per endpoint. The TypeScript types are generated from
+`internal/api/openapi.yaml` at build time, so they cannot drift from the API.
+
+```ts
+import { IbanPizza } from "iban-pizza";
+const api = new IbanPizza({ baseUrl: "https://iban.pizza" });
+const r = await api.validate("DE89 3704 0044 0532 0130 00");
+```
+
+```python
+from iban_pizza import IbanPizza
+r = IbanPizza("https://iban.pizza").validate("DE89 3704 0044 0532 0130 00")
+```
+
+Anything written against openiban.com keeps working too: the v1 routes are
+served unchanged, so an existing client only changes its base URL.
+
 ## Development
 
 ```sh
