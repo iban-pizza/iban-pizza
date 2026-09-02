@@ -1,0 +1,26 @@
+# The service on its own. The bank data is compiled into the image, so this
+# needs nothing else and answers immediately.
+#
+#     docker compose up
+#
+# The published port defaults to 8080 and can be changed with OPENIBAN_PORT.
+# To add PostgreSQL, see compose.postgres.yaml.
+
+services:
+  iban:
+    image: ghcr.io/netzfabrikcom/iban-pizza:latest
+    build: .
+    ports:
+      - "${OPENIBAN_PORT:-8080}:8080"
+    environment:
+      OPENIBAN_LOG_FORMAT: text
+      # Cross origin access is closed by default. Set this to the origins your
+      # frontend is served from, or to "*" to allow any.
+      OPENIBAN_CORS_ORIGINS: ""
+    restart: unless-stopped
+    healthcheck:
+      # The image has no shell and no curl, so the binary checks itself.
+      test: ["CMD", "/openiban", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

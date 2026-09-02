@@ -1,0 +1,55 @@
+# Adds PostgreSQL to the base compose file, for deployments that maintain the
+# dataset centrally or run more than one instance.
+#
+#     docker compose -f compose.yaml -f compose.postgres.yaml up
+#
+# The loader fills the database once and exits. Run it again at any time to
+# refresh the data without touching the service:
+#
+#     docker compose -f compose.yaml -f compose.postgres.yaml run --rm loader
+#
+# This is an override rather than a profile because both variants would
+# otherwise publish the same port and collide.
+
+services:
+  iban:
+    environment:
+      OPENIBAN_DATABASE_URL: postgres://openiban:openiban@db:5432/openiban?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+      # The database starts empty, so it has to be filled before the service
+      # can answer anything.
+      loader:
+        condition: service_completed_successfully
+
+  loader:
+    image: ghcr.io/netzfabrikcom/iban-pizza:latest
+    build: .
+    command:
+      - update
+      - -database-url
+      - postgres://openiban:openiban@db:5432/openiban?sslmode=disable
+      - -log-format
+      - text
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: openiban
+      POSTGRES_PASSWORD: openiban
+      POSTGRES_DB: openiban
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openiban"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

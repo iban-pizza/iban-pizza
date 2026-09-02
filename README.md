@@ -104,12 +104,19 @@ default.
 
 ## Data
 
-Bank data comes from official national registries. Every endpoint, its format,
-encoding, update cadence and licence position is documented in
-[docs/data-sources.md](docs/data-sources.md).
+Bank data comes from official national registries.
+
+- [docs/country-sources.md](docs/country-sources.md) has the status of all 36
+  SEPA countries: which publish a free machine readable bank code registry,
+  which publish only a PDF, which sell it, and which are still unresearched.
+- [docs/data-sources.md](docs/data-sources.md) has the working detail for the
+  sources in use, including the encoding and layout traps.
 
 Currently loaded: Germany (Bundesbank), Austria (OeNB), Czech Republic (CNB),
-plus the EPC Register of Participants for all six SEPA schemes.
+plus the EPC Register of Participants for all six SEPA schemes. Six more
+countries have a verified free source waiting on a spreadsheet reader:
+Switzerland and Liechtenstein, Belgium, the Netherlands, Norway, Hungary and
+Latvia.
 
 Resolving the bank code inside an IBAN needs a national registry. Pan-European
 sources such as the EPC register, the ECB MFI list and GLEIF are keyed by BIC
@@ -141,6 +148,7 @@ file and no database.
 **2. Refresh into a file**, when data should be newer than the binary:
 
 ```sh
+# The file does not have to exist. update creates it, and the directory too.
 openiban update --write-snapshot /var/lib/openiban/data.gz
 openiban serve  -data-file /var/lib/openiban/data.gz
 ```
@@ -156,7 +164,23 @@ openiban update -database-url postgres://user:pass@host/iban
 openiban serve  -database-url postgres://user:pass@host/iban
 ```
 
-The schema is created on connect, so an empty database is enough to start.
+There is no separate step to enable PostgreSQL. Passing `-database-url`, or
+setting `OPENIBAN_DATABASE_URL`, is the whole switch. The schema is created on
+connect, so an empty database is enough to start, and the loader has to run
+once before the service can answer anything.
+
+With Compose that is one command:
+
+```sh
+docker compose -f compose.yaml -f compose.postgres.yaml up
+```
+
+which starts PostgreSQL, runs the loader once, and then starts the service
+against it. Refresh later without touching the service:
+
+```sh
+docker compose -f compose.yaml -f compose.postgres.yaml run --rm loader
+```
 
 In every case `openiban update` resolves the download links from the
 publishers' pages at run time, refuses to replace existing data when a download

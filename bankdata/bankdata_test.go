@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -259,5 +260,26 @@ func TestSaveAndLoadSnapshotFile(t *testing.T) {
 	}
 	if _, err := LoadSnapshotFile(filepath.Join(t.TempDir(), "missing.gz")); err == nil {
 		t.Error("LoadSnapshotFile accepted a missing file")
+	}
+}
+
+// TestSnapshotFileIsReadable covers a trap in the atomic write: os.CreateTemp
+// produces a file only its owner can read, and the rename preserves that. A
+// snapshot written by a deployment user would then be unreadable to the
+// service account, which is a confusing failure a long way from its cause.
+func TestSnapshotFileIsReadable(t *testing.T) {
+	s := loadedStore(t)
+	path := filepath.Join(t.TempDir(), "snapshot.jsonl.gz")
+
+	if err := SaveSnapshotFile(context.Background(), path, s); err != nil {
+		t.Fatalf("SaveSnapshotFile returned %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o644 {
+		t.Errorf("snapshot mode is %04o, want 0644", perm)
 	}
 }
