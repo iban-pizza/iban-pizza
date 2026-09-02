@@ -4,6 +4,20 @@ Three ways to run it, from simplest to most involved. All three answer
 immediately, because the bank data is compiled into the binary and the image.
 Nothing has to be downloaded first.
 
+## In production, in one paragraph
+
+Pull the image, start it, done. There is no import step, no first run
+initialisation and no data download. The bank data is inside the image, and
+the service answers correctly from the first request even with no network
+access at all. To get newer data later, pull a newer image tag; releases are
+cut each quarter with the current registries. That is the whole operating
+model for the standalone deployment, and it is the one to choose unless you
+have a specific reason for the PostgreSQL variant below.
+
+The only case with a loader is PostgreSQL, and it is opt in: several instances
+sharing one centrally maintained dataset, refreshed without redeploying the
+service. Standalone never runs one.
+
 ## What is shipped and what is not
 
 The binary and the image contain a snapshot of the bank registries: Germany,
