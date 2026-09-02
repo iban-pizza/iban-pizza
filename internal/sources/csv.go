@@ -23,10 +23,13 @@ func parseCSV(text string, sep rune, mustContain ...string) (*csvTable, error) {
 
 	headerAt := -1
 	for i, line := range lines {
-		lower := strings.ToLower(line)
+		// Compare with the same normalisation the column index uses, so a
+		// header spelled "Bank Code" satisfies a requirement for "bankCode".
+		// Without this the search fails one step before normalisation runs.
+		lower := normaliseHeader(line)
 		ok := true
 		for _, want := range mustContain {
-			if !strings.Contains(lower, strings.ToLower(want)) {
+			if !strings.Contains(lower, normaliseHeader(want)) {
 				ok = false
 				break
 			}

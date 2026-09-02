@@ -207,6 +207,16 @@ publishers' pages at run time, refuses to replace existing data when a download
 or parse fails, and swaps one country at a time so a broken registry cannot
 take the others down with it.
 
+**4. Import a file you already have**, per country, with no network:
+
+```sh
+openiban import -country DE -file blz-aktuell.txt -database-url postgres://...
+```
+
+Built in parsers cover the countries in the snapshot; every other country
+accepts a generic CSV with a `bankCode,name,...` header. Details in the
+[deployment guide](docs/deployment.md#importing-a-file-you-already-have).
+
 To refresh the snapshot that ships inside the binary, write it back to its
 source location and rebuild:
 

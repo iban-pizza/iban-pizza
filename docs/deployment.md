@@ -215,6 +215,56 @@ downloads and parses without storing, `--countries DE,AT` limits the run.
 openiban update -database-url postgres://...
 ```
 
+`update` always fetches from the publishers. `--countries DE,AT` limits which
+registries it fetches, but it never reads a local file. For that there is
+`import`.
+
+## Importing a file you already have
+
+`openiban import` loads one registry file per country into any of the three
+stores, without contacting a publisher. Use it when the host has no outbound
+network, when a registry's site is down, or for a registry you licensed and
+may not redistribute, such as UK sort codes or the French FIB.
+
+```sh
+# A file in a registry's own format, parsed by the built in parser.
+openiban import -country DE -file blz-aktuell.txt -database-url postgres://...
+
+# Into a snapshot file instead of a database.
+openiban import -country AT -file sepa-zv-vz_gesamt.csv --write-snapshot /var/lib/openiban/data.gz
+
+# Check what a file would produce before touching anything.
+openiban import -country CZ -file kody_bank_CR.csv --dry-run
+```
+
+Each import replaces that source's records and leaves every other country
+untouched, so countries can be loaded one at a time and in any order. The
+file's modification time is recorded as the retrieval time, so an old file is
+reported as old by `/v2/data` rather than looking fresh because it was
+imported today.
+
+### The generic format
+
+Countries without a built in parser accept a delimited file with a header row:
+
+```
+bankCode,name,bic,zip,city,shortName,checkAlgo,country
+```
+
+Only `bankCode` and `name` are required. Column order does not matter, the
+separator (`,` or `;`) is detected from the header, and names are matched
+loosely: `Bank Code`, `bank_code` and `bankCode` are the same column, as are
+`SWIFT` and `bic`, `PLZ` and `zip`, `Ort` and `city`. A `country` column
+overrides `-country` per row, so one file may carry several countries.
+
+```sh
+openiban import -country GB -file sortcodes.csv -source "Licensed sort code directory" \
+                -database-url postgres://...
+```
+
+`-format generic` forces this layout for a country that does have a built in
+parser, for example to load a hand maintained list in place of the registry.
+
 Where the data comes from, per country and with the licence position of each
 source, is in [country-sources.md](country-sources.md).
 

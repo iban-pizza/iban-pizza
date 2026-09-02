@@ -26,6 +26,7 @@ const usage = `openiban serves IBAN validation and bank lookup.
 Usage:
   openiban serve      [flags]   Run the HTTP service
   openiban update     [flags]   Refresh bank data from the official registries
+  openiban import     [flags]   Load a registry file you already have, per country
   openiban snapshot   [flags]   Write the current data to a snapshot file
   openiban version              Print the version
 
@@ -47,6 +48,8 @@ func main() {
 		err = runServe(ctx, os.Args[2:])
 	case "update":
 		err = runUpdate(ctx, os.Args[2:])
+	case "import":
+		err = runImport(ctx, os.Args[2:])
 	case "snapshot":
 		err = runSnapshot(ctx, os.Args[2:])
 	case "version", "-v", "--version":
