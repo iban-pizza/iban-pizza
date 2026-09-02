@@ -91,6 +91,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v2/banks/{country}/{bankCode}", s.handleV2Bank)
 	mux.HandleFunc("GET /v2/banks/{country}/{bankCode}/logo.svg", s.handleV2Logo)
 	mux.HandleFunc("GET /v2/countries", s.handleV2Countries)
+	mux.HandleFunc("GET /v2/data", s.handleV2Data)
 
 	// Operations.
 	mux.HandleFunc("GET /healthz", s.handleHealth)

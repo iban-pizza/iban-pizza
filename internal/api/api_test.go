@@ -347,8 +347,102 @@ func TestHealthReportsFreshness(t *testing.T) {
 	if got.Status != "ok" || got.Stale {
 		t.Errorf("health = %+v", got)
 	}
-	if got.Records == 0 || len(got.Sources) == 0 {
+	if got.Records == 0 {
 		t.Errorf("health reports no data: %+v", got)
+	}
+}
+
+// TestHealthStaysSmall guards the split between liveness and provenance. The
+// health body is polled by orchestrators and must not grow a per source list;
+// that belongs to /v2/data.
+func TestHealthStaysSmall(t *testing.T) {
+	h := testServer(t, nil)
+	body := decode[map[string]any](t, get(t, h, "/healthz"))
+
+	for _, forbidden := range []string{"sources", "schemes"} {
+		if _, ok := body[forbidden]; ok {
+			t.Errorf("health carries %q, which belongs to /v2/data", forbidden)
+		}
+	}
+}
+
+// TestV2DataReportsProvenance covers the endpoint an integrator uses to judge
+// an answer: which registry, retrieved when, how many records, how old.
+func TestV2DataReportsProvenance(t *testing.T) {
+	h := testServer(t, nil)
+	rec := get(t, h, "/v2/data")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	got := decode[DataReport](t, rec)
+
+	if got.Records == 0 {
+		t.Error("no records reported")
+	}
+	if len(got.Sources) != 1 {
+		t.Fatalf("reported %d sources, want 1", len(got.Sources))
+	}
+	src := got.Sources[0]
+	if src.Country != "DE" || src.Name != "Deutsche Bundesbank" {
+		t.Errorf("source = %+v", src)
+	}
+	if src.Records != 2 || src.AgeDays != 0 || src.Stale {
+		t.Errorf("source metadata = %+v", src)
+	}
+	if src.RetrievedAt == "" {
+		t.Error("retrievedAt is empty")
+	}
+	if len(got.Countries) != 1 || got.Countries[0] != "DE" {
+		t.Errorf("countries = %v", got.Countries)
+	}
+	if got.Stale {
+		t.Error("fresh data reported as stale")
+	}
+	if got.StaleAfter == "" {
+		t.Error("staleAfter is empty")
+	}
+
+	if !got.Schemes.Loaded || got.Schemes.Institutions == 0 {
+		t.Errorf("schemes = %+v", got.Schemes)
+	}
+	if got.Schemes.Participants["sctInst"] != 1 {
+		t.Errorf("sctInst participants = %d, want 1", got.Schemes.Participants["sctInst"])
+	}
+	if got.Schemes.AsOf != "2026-08-07" {
+		t.Errorf("schemes asOf = %q", got.Schemes.AsOf)
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc != "no-cache" {
+		t.Errorf("Cache-Control = %q, want no-cache", cc)
+	}
+}
+
+func TestV2DataWithoutSchemes(t *testing.T) {
+	h := testServer(t, func(c *Config) { c.Schemes = nil })
+	got := decode[DataReport](t, get(t, h, "/v2/data"))
+	if got.Schemes.Loaded {
+		t.Error("schemes reported as loaded with no register configured")
+	}
+}
+
+func TestV2DataReportsStaleSource(t *testing.T) {
+	store := bankdata.NewMemoryStore()
+	old := time.Now().Add(-3 * 365 * 24 * time.Hour)
+	_ = store.Replace(context.Background(),
+		bankdata.SourceInfo{Country: "DE", Name: "Deutsche Bundesbank",
+			URL: "https://example.invalid/blz", RetrievedAt: old},
+		[]bankdata.Bank{{Country: "DE", BankCode: "37040044", Name: "Commerzbank", Source: "Deutsche Bundesbank"}})
+
+	h := New(Config{Repo: store, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Handler()
+	got := decode[DataReport](t, get(t, h, "/v2/data"))
+
+	if !got.Stale || !got.Sources[0].Stale {
+		t.Errorf("three year old source not reported stale: %+v", got)
+	}
+	if got.Sources[0].AgeDays < 1000 {
+		t.Errorf("ageDays = %d for a three year old source", got.Sources[0].AgeDays)
+	}
+	if got.Sources[0].URL != "https://example.invalid/blz" {
+		t.Errorf("url = %q, provenance lost", got.Sources[0].URL)
 	}
 }
 
@@ -400,7 +494,7 @@ func TestOpenAPIIsServed(t *testing.T) {
 		t.Errorf("body does not start with an OpenAPI version: %.60s", body)
 	}
 	// Every route the server registers should appear in the description.
-	for _, path := range []string{"/v2/iban/{iban}", "/validate/{iban}", "/healthz", "/v2/banks"} {
+	for _, path := range []string{"/v2/iban/{iban}", "/validate/{iban}", "/healthz", "/v2/banks", "/v2/data"} {
 		if !strings.Contains(body, path) {
 			t.Errorf("the spec does not document %s", path)
 		}

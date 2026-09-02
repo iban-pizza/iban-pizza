@@ -184,6 +184,27 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Country" }
 
+  /v2/data:
+    get:
+      tags: [v2]
+      summary: What the service is answering from.
+      description: |
+        The provenance of the loaded data: which national registry is loaded
+        for which country, when each was retrieved, how many records it holds,
+        and whether it counts as stale. Also whether the EPC scheme register is
+        loaded and how many participants each scheme has.
+
+        Use this to judge answers. "Bank code valid" means something different
+        against a register that is two days old than against one that is two
+        years old. The same dates appear per answer as `dataAsOf`.
+      operationId: dataReport
+      responses:
+        "200":
+          description: The loaded sources and their ages.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataReport" }
+
   /validate/{iban}:
     get:
       tags: [v1]
@@ -439,6 +460,7 @@ components:
 
     Health:
       type: object
+      description: Small on purpose; orchestrators poll it. Provenance is at /v2/data.
       properties:
         status:
           type: string
@@ -447,13 +469,27 @@ components:
         uptime: { type: string }
         records: { type: integer }
         stale: { type: boolean }
+
+    DataReport:
+      type: object
+      properties:
+        records: { type: integer }
+        countries:
+          type: array
+          items: { type: string }
+          description: Countries with a loaded bank registry.
+        stale:
+          type: boolean
+          description: True when any source is older than staleAfter.
+        staleAfter: { type: string, example: 2880h0m0s }
         sources:
           type: array
           items:
             type: object
             properties:
               country: { type: string }
-              name: { type: string }
+              name: { type: string, description: The publishing registry. }
+              url: { type: string, description: The URL the data was fetched from. }
               retrievedAt: { type: string, format: date-time }
               ageDays: { type: integer }
               records: { type: integer }
@@ -461,5 +497,10 @@ components:
         schemes:
           type: object
           properties:
+            loaded: { type: boolean }
             institutions: { type: integer }
             asOf: { type: string, format: date }
+            participants:
+              type: object
+              additionalProperties: { type: integer }
+              description: Participant count per scheme.

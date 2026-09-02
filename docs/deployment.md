@@ -9,7 +9,7 @@ Nothing has to be downloaded first.
 The binary and the image contain a snapshot of the bank registries: Germany,
 Austria and the Czech Republic today, about 110 KB compressed, plus the IBAN
 structure registry for 70 countries. The snapshot's retrieval date is reported
-by `/healthz` and stamped into every v2 answer as `dataAsOf`.
+by `/v2/data` and stamped into every v2 answer as `dataAsOf`.
 
 The EPC scheme register is **not** compiled in. Without it the v2 response
 simply omits the `schemes` block; nothing breaks. Section "Adding the scheme
@@ -157,6 +157,22 @@ kubectl create job --from=cronjob/iban-pizza-loader refresh-now
 The probes are chosen so that old data does not take a pod out of rotation:
 `/readyz` fails only when no bank data is loaded at all, and `/healthz` stays
 200 while the service can answer, reporting staleness in the body instead.
+
+## Knowing what data you are answering from
+
+`/v2/data` reports the provenance of everything loaded: which registry for
+which country, the URL it was fetched from, when, how many records, and
+whether it counts as stale. It also reports whether the EPC scheme register is
+loaded and the participant count per scheme.
+
+```sh
+curl http://localhost:8080/v2/data
+```
+
+`/healthz` carries only the summary (`status`, `records`, `stale`), because
+orchestrators poll it and it should stay small. Every v2 answer also stamps
+the retrieval date of each source it used as `dataAsOf`, so a single response
+can be dated without a second request.
 
 ## Keeping the data current
 

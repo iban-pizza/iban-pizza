@@ -42,6 +42,7 @@ GET  /v2/banks?country=&bic=&name=&limit=   Search banks
 GET  /v2/banks/{country}/{bankCode}         One bank
 GET  /v2/banks/{country}/{bankCode}/logo.svg
 GET  /v2/countries                          The IBAN registry
+GET  /v2/data                               What is loaded, from where, how old
 GET  /healthz /readyz /openapi.yaml
 ```
 
