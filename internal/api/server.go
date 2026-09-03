@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
-	"github.com/netzfabrikcom/iban-pizza/internal/logo"
-	"github.com/netzfabrikcom/iban-pizza/internal/sepa"
+	"github.com/iban-pizza/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/internal/logo"
+	"github.com/iban-pizza/iban-pizza/internal/sepa"
 )
 
 // Config configures the server.

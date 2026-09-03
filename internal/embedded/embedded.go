@@ -11,7 +11,7 @@ import (
 	_ "embed"
 	"errors"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata"
 )
 
 //go:embed snapshot.jsonl.gz

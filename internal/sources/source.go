@@ -12,7 +12,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata"
 )
 
 // Source is one national registry.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata"
 )
 
 // GenericName is the source name recorded for records loaded through the

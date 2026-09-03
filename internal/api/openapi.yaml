@@ -25,7 +25,7 @@ info:
       not be read as "not supported".
   license:
     name: MIT
-    url: https://github.com/netzfabrikcom/iban-pizza/blob/main/LICENSE
+    url: https://github.com/iban-pizza/iban-pizza/blob/main/LICENSE
 
 servers:
   - url: https://iban.pizza

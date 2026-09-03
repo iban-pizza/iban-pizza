@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
-	"github.com/netzfabrikcom/iban-pizza/bankdata/postgres"
+	"github.com/iban-pizza/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata/postgres"
 )
 
 // testStore connects to the database named by IBAN_PIZZA_TEST_DATABASE_URL.

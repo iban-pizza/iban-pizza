@@ -29,7 +29,7 @@ services:
         condition: service_completed_successfully
 
   loader:
-    image: ghcr.io/netzfabrikcom/iban-pizza:latest
+    image: ghcr.io/iban-pizza/iban-pizza:latest
     build: .
     command:
       - import

@@ -1,4 +1,4 @@
-module github.com/netzfabrikcom/iban-pizza
+module github.com/iban-pizza/iban-pizza
 
 go 1.25.0
 

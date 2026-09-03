@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata"
 )
 
 func fixture(t *testing.T, name string) []byte {

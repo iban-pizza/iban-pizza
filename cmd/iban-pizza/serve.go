@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netzfabrikcom/iban-pizza/internal/api"
-	"github.com/netzfabrikcom/iban-pizza/internal/logo"
-	"github.com/netzfabrikcom/iban-pizza/internal/sepa"
+	"github.com/iban-pizza/iban-pizza/internal/api"
+	"github.com/iban-pizza/iban-pizza/internal/logo"
+	"github.com/iban-pizza/iban-pizza/internal/sepa"
 )
 
 func runServe(ctx context.Context, args []string) error {

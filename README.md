@@ -20,7 +20,7 @@
   <a href="https://iban.pizza"><strong>Website</strong></a> &middot;
   <a href="docs/deployment.md"><strong>Deploy</strong></a> &middot;
   <a href="internal/api/openapi.yaml"><strong>API</strong></a> &middot;
-  <a href="https://github.com/NETZFABRIKCOM/iban-pizza/releases"><strong>Releases</strong></a>
+  <a href="https://github.com/iban-pizza/iban-pizza/releases"><strong>Releases</strong></a>
 </p>
 
 <br>
@@ -29,7 +29,7 @@ A ground up rewrite of the [goiban](https://github.com/apilayer/goiban) family
 of projects, whose last release was in 2019.
 
 ```
-docker run -p 8080:8080 ghcr.io/netzfabrikcom/iban-pizza:0.1.0
+docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:0.1.0
 curl http://localhost:8080/v2/iban/DE89370400440532013000
 ```
 
@@ -45,7 +45,7 @@ needs a login with the `read:packages` scope; the released binaries do not. See
 **[docs/deployment.md](docs/deployment.md)** covers every way to run it:
 
 - **Binary**, downloaded from the
-  [releases page](https://github.com/NETZFABRIKCOM/iban-pizza/releases),
+  [releases page](https://github.com/iban-pizza/iban-pizza/releases),
   verified against `SHA256SUMS`, run with one command. Includes a systemd unit.
 - **Docker and Compose**, standalone or with PostgreSQL.
 - **Kubernetes**, from the manifests in `deploy/kubernetes/`.
@@ -255,7 +255,7 @@ a pull request with the result.
 ### Container
 
 ```sh
-docker run -p 8080:8080 ghcr.io/netzfabrikcom/iban-pizza:latest
+docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:latest
 ```
 
 The image is built `FROM scratch`, runs as uid 65534, and contains the binary

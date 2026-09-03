@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
-	"github.com/netzfabrikcom/iban-pizza/bankdata/postgres"
-	"github.com/netzfabrikcom/iban-pizza/internal/embedded"
+	"github.com/iban-pizza/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata/postgres"
+	"github.com/iban-pizza/iban-pizza/internal/embedded"
 )
 
 // version is set at link time with -ldflags "-X main.version=..."

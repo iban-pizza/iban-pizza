@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
-	"github.com/netzfabrikcom/iban-pizza/internal/logo"
-	"github.com/netzfabrikcom/iban-pizza/internal/sepa"
+	"github.com/iban-pizza/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/internal/logo"
+	"github.com/iban-pizza/iban-pizza/internal/sepa"
 )
 
 func testServer(t *testing.T, mutate func(*Config)) http.Handler {

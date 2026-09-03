@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
-	"github.com/netzfabrikcom/iban-pizza/iban"
-	"github.com/netzfabrikcom/iban-pizza/internal/checkdigit"
-	"github.com/netzfabrikcom/iban-pizza/internal/logo"
-	"github.com/netzfabrikcom/iban-pizza/internal/sepa"
+	"github.com/iban-pizza/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/iban"
+	"github.com/iban-pizza/iban-pizza/internal/checkdigit"
+	"github.com/iban-pizza/iban-pizza/internal/logo"
+	"github.com/iban-pizza/iban-pizza/internal/sepa"
 )
 
 // MaxBatchSize bounds a batch request.

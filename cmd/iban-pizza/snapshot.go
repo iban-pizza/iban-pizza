@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata"
 )
 
 func runSnapshot(ctx context.Context, args []string) error {

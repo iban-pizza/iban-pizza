@@ -50,7 +50,7 @@ spec:
             runAsUser: 65534
           containers:
             - name: loader
-              image: ghcr.io/netzfabrikcom/iban-pizza:0.1.0
+              image: ghcr.io/iban-pizza/iban-pizza:0.1.0
               args: ["import", "-snapshot", "embedded", "-log-format", "json"]
               env:
                 - name: IBAN_PIZZA_DATABASE_URL
@@ -95,7 +95,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: iban-pizza
-          image: ghcr.io/netzfabrikcom/iban-pizza:0.1.0
+          image: ghcr.io/iban-pizza/iban-pizza:0.1.0
           args: ["serve", "-addr", ":8080"]
           ports:
             - name: http

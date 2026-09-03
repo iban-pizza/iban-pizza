@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/netzfabrikcom/iban-pizza/bankdata"
+	"github.com/iban-pizza/iban-pizza/bankdata"
 )
 
 func init() { Register(CNB{}) }
