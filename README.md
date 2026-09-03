@@ -29,7 +29,7 @@ A ground up rewrite of the [goiban](https://github.com/apilayer/goiban) family
 of projects, whose last release was in 2019.
 
 ```
-docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:0.1.0
+docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:0.2.0
 curl http://localhost:8080/v2/iban/DE89370400440532013000
 ```
 

@@ -32,7 +32,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: iban-pizza
-          image: ghcr.io/iban-pizza/iban-pizza:0.1.0
+          image: ghcr.io/iban-pizza/iban-pizza:0.2.0
           args: ["serve", "-addr", ":8080"]
           ports:
             - name: http

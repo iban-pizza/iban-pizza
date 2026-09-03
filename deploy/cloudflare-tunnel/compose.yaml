@@ -14,7 +14,7 @@
 
 services:
   iban-pizza:
-    image: ghcr.io/iban-pizza/iban-pizza:0.1.0
+    image: ghcr.io/iban-pizza/iban-pizza:0.2.0
     # Not published on the host. Only cloudflared, on the same network, can
     # reach it.
     expose:

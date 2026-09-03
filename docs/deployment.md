@@ -37,7 +37,7 @@ it, and run it:
 
 ```sh
 # Linux, amd64. Substitute the version and your platform.
-V=0.1.0
+V=0.2.0
 curl -LO https://github.com/iban-pizza/iban-pizza/releases/download/v$V/iban-pizza_v${V}_linux_amd64
 curl -LO https://github.com/iban-pizza/iban-pizza/releases/download/v$V/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
@@ -110,7 +110,7 @@ another origin needs `IBAN_PIZZA_CORS_ORIGINS` set to that origin.
 ## 2. Docker and Compose
 
 ```sh
-docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:0.1.0
+docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:0.2.0
 ```
 
 The image is built `FROM scratch`: the binary, the certificate roots for
@@ -125,7 +125,7 @@ token with the `read:packages` scope, and a `docker login`:
 ```sh
 gh auth refresh -h github.com -s read:packages
 gh auth token | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
-docker pull ghcr.io/iban-pizza/iban-pizza:0.1.0
+docker pull ghcr.io/iban-pizza/iban-pizza:0.2.0
 ```
 
 The `repo` scope alone is not enough, even for a member of the organisation;
