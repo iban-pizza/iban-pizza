@@ -60,6 +60,9 @@ jobs:
               ./cmd/iban-pizza
           done
 
+          # The licence notices travel with every release, as the MIT licence
+          # requires of copies of the software.
+          cp LICENSE NOTICE dist/
           cd dist
           # One checksum file covering every artefact, so a download can be
           # verified without trusting the transfer.

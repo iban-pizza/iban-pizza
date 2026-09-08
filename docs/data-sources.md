@@ -66,8 +66,11 @@ Code and data are separate questions, and the data is the one that matters for
 redistribution.
 
 - **GLEIF**: CC0, unrestricted.
-- **OeNB (AT)**: the CSV header states the data is provided solely under the OeNB's
-  disclaimer and copyright terms.
+- **OeNB (AT)**: the CSV header points at the OeNB's disclaimer and copyright terms.
+  Those terms (Impressum und Haftung, section 2.2, under the Austrian
+  Informationsweiterverwendungsgesetz 2022) grant reuse of OeNB website data under
+  **CC BY 4.0**, expressly including commercial use without separate consent.
+  Attribution is required and is given in NOTICE; verified 2026-09-08.
 - **Bundesbank, SIX, NBB, Betaalvereniging, ČNB, EPC, ECB**: each has its own terms of
   use; review them before redistributing a populated snapshot commercially.
 

@@ -1,6 +1,7 @@
 MIT License
 
-Copyright (c) 2013-2018 Chris Grieger
+Copyright (c) 2013-2018 Chris Grieger (goiban, goiban-service, goiban-data-loader)
+Copyright (c) 2026 Fynn GmbH (this rewrite)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

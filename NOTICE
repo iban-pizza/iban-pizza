@@ -1,8 +1,8 @@
 iban.pizza
 ==========
 
-This project is a fork and substantial rewrite of the "goiban" family of
-projects originally written by Chris Grieger:
+This project is maintained by Fynn GmbH. It is a substantial rewrite of the
+"goiban" family of projects originally written by Chris Grieger:
 
     https://github.com/apilayer/goiban
     https://github.com/apilayer/goiban-service
@@ -10,8 +10,17 @@ projects originally written by Chris Grieger:
 
 Those three repositories are MIT licensed, Copyright (c) 2013-2018 Chris
 Grieger. Their licence text is reproduced in LICENSE and continues to apply to
-the portions of this project derived from them (notably the mod-97 validation
-routine and the country/length tables in iban/).
+the portions of this project derived from them: the mod-97 validation
+approach and the country length table in iban/, the country name map and the
+message strings of the v1 compatibility surface in internal/api/, and the
+Commerzbank BIC rule. Everything else is new work, Copyright (c) 2026
+Fynn GmbH, released under the same MIT licence.
+
+Neither GitHub's "fork" feature nor the preservation of upstream commit
+history is a condition of the MIT licence. Its only condition is that the
+copyright notice and the permission notice accompany copies and substantial
+portions, which LICENSE and this file do, in the source, in the container
+image and in every release.
 
 NOT DERIVED FROM: github.com/apilayer/goiban-data
     That repository carries no licence file and no licence headers, so no
@@ -27,6 +36,12 @@ TRADEMARKS
 DATA SOURCES
     Bank reference data is obtained from national and European sources, each
     under its own terms of use. See docs/data-sources.md for the per-source
-    licence position. Notably the OeNB dataset carries an explicit copyright
-    and liability reservation in its file header, and redistribution terms
-    differ per source. GLEIF BIC-to-LEI data is published under CC0.
+    licence position.
+
+    Austria: the SEPA payment directory is published by the Oesterreichische
+    Nationalbank (OeNB) and reused here under the Creative Commons Attribution
+    4.0 licence (CC BY 4.0), which the OeNB grants for its website data
+    including commercial use. Source: https://www.oenb.at, (c) OeNB.
+
+    GLEIF BIC-to-LEI data is published under CC0. Terms for the remaining
+    sources differ; see the documentation.

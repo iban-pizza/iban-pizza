@@ -36,5 +36,6 @@
     "openapi-typescript": "^7",
     "typescript": "^5",
     "vitest": "^3"
-  }
+  },
+  "author": "Fynn GmbH"
 }

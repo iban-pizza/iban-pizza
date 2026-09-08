@@ -30,6 +30,9 @@ FROM scratch
 # Certificate roots, needed by "iban-pizza update" to reach the registries.
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /iban-pizza /iban-pizza
+# The MIT licence requires the notices to accompany copies of the software;
+# the image is a copy.
+COPY LICENSE NOTICE /
 
 # An unprivileged, non existent user. scratch has no /etc/passwd, so the
 # numeric form is the only one that works.
