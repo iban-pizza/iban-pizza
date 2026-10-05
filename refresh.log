@@ -1,0 +1,17 @@
+go: downloading github.com/jackc/pgx/v5 v5.10.0
+go: downloading github.com/jackc/puddle/v2 v2.2.2
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+go: downloading golang.org/x/text v0.39.0
+go: downloading golang.org/x/sync v0.21.0
+time=2026-10-05T12:48:42.713Z level=INFO msg=updated country=AT source="Oesterreichische Nationalbank" records=873 took=1.265s
+time=2026-10-05T12:48:43.764Z level=INFO msg=updated country=CZ source="Ceska narodni banka" records=47 took=1.051s
+time=2026-10-05T12:48:45.967Z level=INFO msg=updated country=DE source="Deutsche Bundesbank" records=3507 took=2.203s
+time=2026-10-05T12:48:46.243Z level=INFO msg="scheme downloaded" scheme=sct participants=3508
+time=2026-10-05T12:48:46.447Z level=INFO msg="scheme downloaded" scheme=sctInst participants=2820
+time=2026-10-05T12:48:46.745Z level=INFO msg="scheme downloaded" scheme=sddCore participants=2742
+time=2026-10-05T12:48:46.977Z level=INFO msg="scheme downloaded" scheme=sddB2B participants=2299
+time=2026-10-05T12:48:47.169Z level=INFO msg="scheme downloaded" scheme=octInst participants=98
+time=2026-10-05T12:48:47.376Z level=INFO msg="scheme downloaded" scheme=vop participants=2813
+time=2026-10-05T12:48:47.377Z level=INFO msg="scheme register written" dir=data/schemes schemes=6
+time=2026-10-05T12:48:47.399Z level=INFO msg="snapshot written" path=internal/embedded/snapshot.jsonl.gz bytes=109660
