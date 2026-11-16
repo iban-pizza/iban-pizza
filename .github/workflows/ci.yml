@@ -226,5 +226,25 @@ jobs:
             curl -sf http://127.0.0.1:8080/healthz >/dev/null && break
             sleep 0.5
           done
+          # The image contains no bank data, so a bare container validates
+          # structure and reports that it is not ready to resolve banks.
+          curl -sf http://127.0.0.1:8080/v2/iban/DE89370400440532013000 | grep -q '"valid":true'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/readyz)" = 503
+          docker rm -f iban
+
+      # The data directory has to be writable by the image's unprivileged
+      # user, or "update" fails on every fresh volume. Importing the test file
+      # into a volume and serving from it proves that without contacting a
+      # publisher.
+      - name: Load data into a volume and serve it
+        run: |
+          docker volume create ibandata
+          docker run --rm -v ibandata:/data -v "$PWD/cmd/iban-pizza/testdata:/fixture:ro" iban-pizza:ci \
+            import -country DE -format generic -file /fixture/banks.csv
+          docker run -d --name iban -p 8080:8080 -v ibandata:/data iban-pizza:ci
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8080/healthz >/dev/null && break
+            sleep 0.5
+          done
           curl -sf http://127.0.0.1:8080/readyz
           docker rm -f iban
