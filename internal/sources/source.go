@@ -31,6 +31,44 @@ type Source interface {
 
 	// Parse converts raw bytes into bank records.
 	Parse(data []byte) ([]bankdata.Bank, error)
+
+	// Terms states the conditions the publisher attaches to the data.
+	Terms() Terms
+}
+
+// Terms describes the conditions a publisher attaches to its data.
+//
+// The program ships no bank data; "iban-pizza update" downloads it to the
+// operator's machine straight from the publisher. These terms are therefore
+// the operator's to observe, and they are recorded with the data and shown by
+// "iban-pizza sources" so that nobody has to go looking for them.
+type Terms struct {
+	// Licence is the name of the licence, or of the publisher's terms of use
+	// where no named licence applies.
+	Licence string
+	// URL is where the terms are published.
+	URL string
+	// Attribution is the source statement the publisher asks for.
+	Attribution string
+	// Note summarises conditions beyond attribution, in one sentence.
+	Note string
+}
+
+// Partial is implemented by sources whose registry is known not to list every
+// institution that issues IBANs in the country: a list of credit institutions
+// that leaves out payment institutions, a register filtered by entity type, a
+// list in which a large institution is simply absent. The service then
+// reports a bank code it cannot find as unknown instead of invalid.
+type Partial interface {
+	// Partial explains in a sentence what the registry leaves out.
+	Partial() string
+}
+
+// Dated is implemented by sources whose file states its own revision date.
+type Dated interface {
+	// PublishedAt returns the date found in the file, or the zero time when
+	// the file carries none in the expected place.
+	PublishedAt(data []byte) time.Time
 }
 
 // Result reports the outcome of updating one source.
@@ -41,6 +79,13 @@ type Result struct {
 	Records     int
 	RetrievedAt time.Time
 	Err         error
+
+	// BICsJoined counts the BICs that came from the BIC-to-LEI mapping rather
+	// than from the registry itself.
+	BICsJoined int
+	// Warning reports a problem that did not stop the update, such as the
+	// mapping being unreachable, in which case those records stay without BIC.
+	Warning string
 }
 
 // registry holds the available sources keyed by country code.
@@ -107,12 +152,32 @@ func Update(ctx context.Context, c *Client, s Source, w bankdata.Writer) Result 
 	}
 	res.Records = len(banks)
 
+	// A registry without BICs still identifies the bank, so failing to reach
+	// the mapping degrades the result instead of discarding it.
+	if needsBICs(banks) {
+		if mapping, err := c.BICMapping(ctx); err != nil {
+			res.Warning = fmt.Sprintf("BIC mapping unavailable, records stay without BIC: %v", err)
+		} else {
+			res.BICsJoined = mapping.Fill(banks)
+		}
+	}
+
+	terms := s.Terms()
 	info := bankdata.SourceInfo{
 		Country:     s.Country(),
 		Name:        s.Name(),
 		URL:         url,
 		RetrievedAt: res.RetrievedAt,
 		RecordCount: len(banks),
+		Licence:     terms.Licence,
+		TermsURL:    terms.URL,
+		Attribution: terms.Attribution,
+	}
+	if _, ok := s.(Partial); ok {
+		info.Partial = true
+	}
+	if d, ok := s.(Dated); ok {
+		info.PublishedAt = d.PublishedAt(raw)
 	}
 	if err := w.Replace(ctx, info, banks); err != nil {
 		res.Err = fmt.Errorf("store %s: %w", s.Name(), err)

@@ -2,6 +2,6 @@
 coverage.out
 *.test
 
-# Scheme exports are downloaded by "iban-pizza update --scheme-dir" and are not
-# checked in; the embedded snapshot under internal/embedded is.
-/data/schemes/
+# Bank data and scheme exports are downloaded by "iban-pizza update" and are
+# never checked in: the repository carries no third party data.
+/data/

@@ -1,9 +1,16 @@
 # iban.pizza on Kubernetes, standalone.
 #
-# The bank data is compiled into the image, so this needs no volume, no
-# database and no init container. Apply it and the service answers.
+# The image contains no bank data: every registry has its own terms of use,
+# so the data is downloaded where it is used. An init container fetches it
+# into a volume and the service starts on the result. Each publisher's terms
+# apply to what you download; "iban-pizza sources" lists them.
 #
 #     kubectl apply -f deploy/kubernetes/deployment.yaml
+#
+# The data is fetched when a pod starts, so restart the Deployment to refresh
+# it:
+#
+#     kubectl rollout restart deployment/iban-pizza
 #
 # Pin the image tag to a release rather than "latest" in anything you keep.
 apiVersion: apps/v1
@@ -30,10 +37,34 @@ spec:
         runAsGroup: 65534
         seccompProfile:
           type: RuntimeDefault
+      # The image contains no bank data. This downloads the registries from
+      # their official publishers into the pod's data volume before the
+      # service starts, so the namespace must allow that egress. Every pod
+      # fetches its own copy; with many replicas, or to control when the data
+      # changes, use the PostgreSQL variant in postgres.yaml instead.
+      initContainers:
+        - name: data
+          image: ghcr.io/iban-pizza/iban-pizza:0.3.0
+          args: ["update", "-allow-partial", "-log-format", "json"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: data
+          emptyDir: {}
       containers:
         - name: iban-pizza
-          image: ghcr.io/iban-pizza/iban-pizza:0.2.0
+          image: ghcr.io/iban-pizza/iban-pizza:0.3.0
           args: ["serve", "-addr", ":8080"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
           ports:
             - name: http
               containerPort: 8080
@@ -55,8 +86,7 @@ spec:
               memory: 32Mi
             limits:
               memory: 128Mi
-          # readyz fails until bank data is loaded, which with the embedded
-          # snapshot is immediate. healthz stays 200 while the service can
+          # readyz fails until bank data is loaded. healthz stays 200 while the service can
           # answer at all; stale data is reported in its body, not as a
           # failure, so old data does not take a working pod out of rotation.
           readinessProbe:

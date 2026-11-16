@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/iban-pizza/iban-pizza/bankdata"
-	"github.com/iban-pizza/iban-pizza/internal/embedded"
 	"github.com/iban-pizza/iban-pizza/internal/sources"
 )
 
@@ -23,12 +22,12 @@ func runImport(ctx context.Context, args []string) error {
 	country := fs.String("country", "", "ISO 3166-1 alpha-2 code of the file's country")
 	file := fs.String("file", "", "path to the registry file to import")
 	snapshot := fs.String("snapshot", "",
-		`copy every source from a snapshot instead: a file path, or "embedded" for the one built into this binary`)
+		"copy every source from a data file instead, for example into a database")
 	source := fs.String("source", "", "source name to record; defaults to the registry's name")
 	format := fs.String("format", "auto",
 		`"auto" uses the built in parser for the country, "generic" reads the documented CSV layout`)
 	dryRun := fs.Bool("dry-run", false, "parse and report but do not store anything")
-	snapshotPath := fs.String("write-snapshot", "", "also write the result to this snapshot file")
+	snapshotPath := fs.String("write-snapshot", "", "also write the result to this additional file")
 	logFormat := fs.String("log-format", envOr("IBAN_PIZZA_LOG_FORMAT", "text"), "json or text")
 
 	if err := fs.Parse(args); err != nil {
@@ -92,7 +91,7 @@ func runImport(ctx context.Context, args []string) error {
 		return nil
 	}
 
-	repo, writer, closeStore, err := data.openWritableStore(ctx, log)
+	repo, writer, save, closeStore, err := data.openWritableStore(ctx, log)
 	if err != nil {
 		return err
 	}
@@ -109,6 +108,9 @@ func runImport(ctx context.Context, args []string) error {
 		return fmt.Errorf("store: %w", err)
 	}
 	log.Info("stored", "country", cc, "source", recorded, "records", len(banks))
+	if err := save(ctx); err != nil {
+		return err
+	}
 
 	if *snapshotPath != "" {
 		if err := bankdata.SaveSnapshotFile(ctx, *snapshotPath, repo); err != nil {
@@ -129,28 +131,16 @@ func fileTime(path string) time.Time {
 	return time.Now().UTC()
 }
 
-// importSnapshot copies every source of a snapshot into the target store.
+// importSnapshot copies every source of a data file into the target store.
 //
-// With "embedded" this is the secure way to fill a database: the data was
-// fetched, tested and reviewed in the release pipeline and shipped inside the
-// binary, and the host running this never contacts a publisher. It is also
-// idempotent, so running it on every rollout keeps the database in step with
-// the image.
+// This is how one downloaded data file reaches a database, or several hosts,
+// without each of them contacting the publishers: run "iban-pizza update" once
+// where egress is allowed, then import the resulting file elsewhere. It is
+// idempotent, so running it on every rollout is safe.
 func importSnapshot(ctx context.Context, data *dataSource, from string, dryRun bool, snapshotPath string, log *slog.Logger) error {
-	var (
-		src *bankdata.MemoryStore
-		err error
-	)
-	if from == "embedded" {
-		src, err = embedded.Load()
-		if err != nil {
-			return fmt.Errorf("load embedded snapshot: %w", err)
-		}
-	} else {
-		src, err = bankdata.LoadSnapshotFile(from)
-		if err != nil {
-			return fmt.Errorf("load %s: %w", from, err)
-		}
+	src, err := bankdata.LoadSnapshotFile(from)
+	if err != nil {
+		return fmt.Errorf("load %s: %w", from, err)
 	}
 
 	stats, err := src.Stats(ctx)
@@ -166,7 +156,7 @@ func importSnapshot(ctx context.Context, data *dataSource, from string, dryRun b
 		return nil
 	}
 
-	repo, writer, closeStore, err := data.openWritableStore(ctx, log)
+	repo, writer, save, closeStore, err := data.openWritableStore(ctx, log)
 	if err != nil {
 		return err
 	}
@@ -178,6 +168,9 @@ func importSnapshot(ctx context.Context, data *dataSource, from string, dryRun b
 	}
 	if err != nil {
 		return fmt.Errorf("copy snapshot: %w", err)
+	}
+	if err := save(ctx); err != nil {
+		return err
 	}
 
 	if snapshotPath != "" {

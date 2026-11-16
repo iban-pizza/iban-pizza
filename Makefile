@@ -25,9 +25,11 @@ vuln:
 run: build
 	./bin/iban-pizza serve -scheme-file data/schemes -log-format text
 
-# Refresh the bank data and the embedded snapshot from the official registries.
+# Download the bank data and the scheme register from the official publishers
+# into ./data, which is not checked in. Each publisher's terms apply; list them
+# with "./bin/iban-pizza sources".
 update: build
-	./bin/iban-pizza update --write-snapshot internal/embedded/snapshot.jsonl.gz --scheme-dir data/schemes
+	./bin/iban-pizza update -scheme-dir data/schemes
 
 docker:
 	docker build --build-arg VERSION=$(VERSION) -t iban-pizza:$(VERSION) .

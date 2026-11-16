@@ -482,6 +482,34 @@ func TestReadyRequiresData(t *testing.T) {
 	}
 }
 
+// The service ships without bank data. Before any registry is downloaded it
+// must still judge the structure of an IBAN, and must not report a bank code
+// as wrong merely because there is nothing to check it against.
+func TestWithoutBankDataOnlyStructureIsJudged(t *testing.T) {
+	empty := New(Config{
+		Repo:   bankdata.NewMemoryStore(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}).Handler()
+
+	v2 := decode[V2Result](t, get(t, empty, "/v2/iban/DE89370400440532013000"))
+	if !v2.Valid {
+		t.Errorf("v2 called a structurally valid IBAN invalid without bank data: %+v", v2.Checks)
+	}
+	if c := v2.Checks["bankCode"]; c.OK != nil {
+		t.Errorf("v2 bankCode check = %v, want unchecked", *c.OK)
+	}
+
+	v1 := decode[v1Result](t, get(t, empty, "/validate/DE89370400440532013000?validateBankCode=true&getBIC=true"))
+	if !v1.Valid {
+		t.Errorf("v1 called a structurally valid IBAN invalid without bank data: %v", v1.Messages)
+	}
+
+	// A broken checksum is still caught.
+	if bad := decode[V2Result](t, get(t, empty, "/v2/iban/DE89370400440532013001")); bad.Valid {
+		t.Error("v2 accepted an IBAN with a wrong checksum")
+	}
+}
+
 func TestOpenAPIIsServed(t *testing.T) {
 	h := testServer(t, nil)
 	rec := get(t, h, "/openapi.yaml")
@@ -642,5 +670,42 @@ func TestRateLimitBehindProxySeparatesClients(t *testing.T) {
 	}
 	if got := send("203.0.113.2"); got != http.StatusOK {
 		t.Errorf("a different client behind the same proxy was limited: %d", got)
+	}
+}
+
+// A registry known to have gaps must not turn a bank code it does not list
+// into an invalid IBAN: the Italian register, for one, lacks an institution
+// that holds millions of accounts.
+func TestPartialRegistryDoesNotRejectUnknownBankCodes(t *testing.T) {
+	ctx := context.Background()
+	store := bankdata.NewMemoryStore()
+	load := func(country, code string, partial bool) {
+		t.Helper()
+		info := bankdata.SourceInfo{Country: country, Name: "Registry " + country, RetrievedAt: time.Now(), Partial: partial}
+		bank := bankdata.Bank{Country: country, BankCode: code, Name: "Example Bank", Source: info.Name}
+		if err := store.Replace(ctx, info, []bankdata.Bank{bank}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	load("IT", "99999", true)
+	load("DE", "99999999", false)
+	h := New(Config{Repo: store, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Handler()
+
+	it := decode[V2Result](t, get(t, h, "/v2/iban/IT60X0542811101000000123456"))
+	if !it.Valid {
+		t.Errorf("an unknown code in a partial registry made the IBAN invalid: %+v", it.Checks["bankCode"])
+	}
+	if c := it.Checks["bankCode"]; c.OK != nil {
+		t.Errorf("bankCode check = %v, want unchecked", *c.OK)
+	}
+	v1 := decode[v1Result](t, get(t, h, "/validate/IT60X0542811101000000123456?validateBankCode=true"))
+	if !v1.Valid {
+		t.Errorf("v1 rejected an unknown code in a partial registry: %v", v1.Messages)
+	}
+
+	// A complete registry still rejects a code it does not list.
+	de := decode[V2Result](t, get(t, h, "/v2/iban/DE89370400440532013000"))
+	if de.Valid {
+		t.Error("an unknown code in a complete registry was accepted")
 	}
 }

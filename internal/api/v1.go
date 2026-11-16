@@ -118,6 +118,28 @@ func (s *Server) v1ValidateBankCode(ctx context.Context, parsed *iban.IBAN, resu
 
 	code := bban[:length]
 	if _, err := s.cfg.Repo.Find(ctx, bankdata.Key{Country: cc, BankCode: code}); err != nil {
+		// The service ships without bank data, so a country whose registry
+		// has not been downloaded is the normal state of a fresh install.
+		// Calling every bank code of that country invalid would turn "not
+		// checked" into "wrong", so this is reported like the other case
+		// where validation is impossible and leaves the verdict alone.
+		if errors.Is(err, bankdata.ErrNotFound) {
+			switch s.coverage(ctx, cc) {
+			case coverageNone:
+				result.CheckResults["bankCode"] = false
+				result.Messages = append(result.Messages,
+					"Cannot validate bank code. No bank data is loaded for country '"+cc+"'.")
+				return
+			case coveragePartial:
+				// The registry for this country is known to have gaps, so a
+				// code it does not list may still be a real one.
+				result.CheckResults["bankCode"] = false
+				result.Messages = append(result.Messages,
+					"Cannot validate bank code. "+code+" is not in the directory for country '"+
+						cc+"', which does not list every institution.")
+				return
+			}
+		}
 		result.Valid = false
 		result.CheckResults["bankCode"] = false
 		result.Messages = append(result.Messages, "Invalid bank code: "+code)

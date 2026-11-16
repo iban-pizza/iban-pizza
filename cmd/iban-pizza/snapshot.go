@@ -15,11 +15,15 @@ func runSnapshot(ctx context.Context, args []string) error {
 	var data dataSource
 	data.bind(fs)
 
-	out := fs.String("out", "internal/embedded/snapshot.jsonl.gz", "path to write the snapshot to")
+	out := fs.String("out", "", "path to write the copy to (required)")
 	logFormat := fs.String("log-format", envOr("IBAN_PIZZA_LOG_FORMAT", "text"), "json or text")
 
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if *out == "" {
+		return fmt.Errorf("-out is required")
 	}
 
 	log := newLogger(*logFormat, "info")

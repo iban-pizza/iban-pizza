@@ -1,12 +1,33 @@
-# The service on its own. The bank data is compiled into the image, so this
-# needs nothing else and answers immediately.
+# The service on its own.
 #
 #     docker compose up
+#
+# The image contains no bank data. On the first start the "data" service
+# downloads the registries from their official publishers into a volume, then
+# exits, and the service starts on what it fetched. Each publisher's terms
+# apply to the data you download; list them with:
+#
+#     docker compose run --rm data sources
+#
+# Refresh the data at any time, then restart the service to load it:
+#
+#     docker compose run --rm data
+#     docker compose restart iban
 #
 # The published port defaults to 8080 and can be changed with IBAN_PIZZA_PORT.
 # To add PostgreSQL, see compose.postgres.yaml.
 
 services:
+  data:
+    image: ghcr.io/iban-pizza/iban-pizza:latest
+    build: .
+    # One unreachable publisher should not keep the service from starting on
+    # the registries that did download, hence -allow-partial.
+    command: ["update", "-allow-partial", "-log-format", "text"]
+    volumes:
+      - bankdata:/data
+    restart: "no"
+
   iban:
     image: ghcr.io/iban-pizza/iban-pizza:latest
     build: .
@@ -17,6 +38,11 @@ services:
       # Cross origin access is closed by default. Set this to the origins your
       # frontend is served from, or to "*" to allow any.
       IBAN_PIZZA_CORS_ORIGINS: ""
+    volumes:
+      - bankdata:/data
+    depends_on:
+      data:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       # The image has no shell and no curl, so the binary checks itself.
@@ -24,3 +50,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  bankdata:

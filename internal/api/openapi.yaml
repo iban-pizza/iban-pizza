@@ -371,6 +371,12 @@ components:
         zip: { type: string }
         city: { type: string }
         bic: { type: string }
+        bicSource:
+          type: string
+          description: Set when the registry publishes no BIC and it was joined from a second dataset; names that dataset.
+        lei:
+          type: string
+          description: Legal Entity Identifier, where the registry publishes it.
         source:
           type: string
           description: The registry this record came from.
@@ -491,6 +497,16 @@ components:
               name: { type: string, description: The publishing registry. }
               url: { type: string, description: The URL the data was fetched from. }
               retrievedAt: { type: string, format: date-time }
+              publishedAt:
+                type: string
+                format: date
+                description: The date the publisher states on the file, where it states one.
+              licence: { type: string, description: The licence or terms the publisher attaches to the data. }
+              termsUrl: { type: string, description: Where those terms are published. }
+              attribution: { type: string, description: The source statement the publisher asks for. }
+              partial:
+                type: boolean
+                description: The registry is known not to list every institution of the country. A bank code missing from it is reported as unchecked, not as invalid.
               ageDays: { type: integer }
               records: { type: integer }
               stale: { type: boolean }

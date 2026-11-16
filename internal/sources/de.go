@@ -30,6 +30,15 @@ type Bundesbank struct{}
 func (Bundesbank) Country() string { return "DE" }
 func (Bundesbank) Name() string    { return "Deutsche Bundesbank" }
 
+func (Bundesbank) Terms() Terms {
+	return Terms{
+		Licence:     "Benutzerhinweise der Deutschen Bundesbank",
+		URL:         "https://www.bundesbank.de/de/startseite/benutzerhinweise/benutzerhinweise-642874",
+		Attribution: "Quelle: Deutsche Bundesbank",
+		Note:        "May be stored, passed on and reproduced with the source named; the information must not be altered.",
+	}
+}
+
 func (b Bundesbank) Fetch(ctx context.Context, c *Client) ([]byte, string, error) {
 	url, err := c.ResolveLink(ctx, bundesbankPage, bundesbankLink)
 	if err != nil {

@@ -24,6 +24,15 @@ type OeNB struct{}
 func (OeNB) Country() string { return "AT" }
 func (OeNB) Name() string    { return "Oesterreichische Nationalbank" }
 
+func (OeNB) Terms() Terms {
+	return Terms{
+		Licence:     "CC BY 4.0",
+		URL:         "https://www.oenb.at/serviceportal/impressum-und-haftung.html",
+		Attribution: "Quelle: Oesterreichische Nationalbank (OeNB), SEPA-Zahlungsverkehrsverzeichnis, CC BY 4.0",
+		Note:        "Reuse is allowed, commercially too, with attribution and a note that the data was modified.",
+	}
+}
+
 func (o OeNB) Fetch(ctx context.Context, c *Client) ([]byte, string, error) {
 	data, err := c.Get(ctx, oenbURL)
 	return data, oenbURL, err

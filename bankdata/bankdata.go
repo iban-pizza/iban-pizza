@@ -29,6 +29,15 @@ type Bank struct {
 	City      string `json:"city,omitempty"`
 	BIC       string `json:"bic,omitempty"`
 
+	// BICSource names where the BIC came from when the registry itself does
+	// not publish one and it was joined from a second dataset. It is empty
+	// when the BIC is the registry's own.
+	BICSource string `json:"bicSource,omitempty"`
+
+	// LEI is the Legal Entity Identifier, for the registries that publish it.
+	// It is the key a missing BIC is joined on.
+	LEI string `json:"lei,omitempty"`
+
 	// CheckAlgo identifies the national account check digit method, currently
 	// only populated for Germany where the Bundesbank publishes it.
 	CheckAlgo string `json:"checkAlgo,omitempty"`
@@ -65,6 +74,24 @@ type SourceInfo struct {
 	URL         string    `json:"url,omitempty"`
 	RetrievedAt time.Time `json:"retrievedAt"`
 	RecordCount int       `json:"recordCount"`
+
+	// PublishedAt is the date the publisher puts on the file itself, where it
+	// states one. RetrievedAt only says when the file was downloaded, which
+	// can be long after its content was last revised.
+	PublishedAt time.Time `json:"publishedAt,omitzero"`
+
+	// Licence, TermsURL and Attribution record the conditions the publisher
+	// attaches to the data. Nothing ships with the program, so these describe
+	// what the operator who downloaded the data has agreed to observe.
+	Licence     string `json:"licence,omitempty"`
+	TermsURL    string `json:"termsUrl,omitempty"`
+	Attribution string `json:"attribution,omitempty"`
+
+	// Partial marks a registry that is known not to list every institution
+	// issuing IBANs in its country. A bank code missing from a complete
+	// registry is wrong; one missing from a partial registry is merely
+	// unknown, and calling it wrong would reject valid IBANs.
+	Partial bool `json:"partial,omitempty"`
 }
 
 // Stats summarises the contents of a repository.
@@ -134,7 +161,7 @@ type Repository interface {
 }
 
 // Writer is write access, used by the update pipeline. Backends that serve
-// read-only data (the embedded snapshot) do not implement it.
+// read-only data do not implement it.
 type Writer interface {
 	// Replace atomically swaps all records for one source.
 	Replace(ctx context.Context, info SourceInfo, banks []Bank) error

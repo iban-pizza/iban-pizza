@@ -112,7 +112,7 @@ describe.skipIf(!live)("against a running instance", () => {
     const countries = await c.countries();
     expect(countries.find((x) => x.code === "DE")?.hasBankData).toBe(true);
     const data = await c.data();
-    expect(data.records).toBeGreaterThan(1000);
+    expect(data.records).toBeGreaterThan(0);
     expect((await c.health()).status).toMatch(/ok|stale/);
   });
 

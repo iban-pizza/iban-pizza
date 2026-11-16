@@ -34,14 +34,37 @@ TRADEMARKS
     respective owners; see internal/logo/ for how they are handled.
 
 DATA SOURCES
-    Bank reference data is obtained from national and European sources, each
-    under its own terms of use. See docs/data-sources.md for the per-source
-    licence position.
+    This project distributes no bank data. The repository, the released
+    binaries and the container image contain parsers only. "iban-pizza update"
+    downloads each registry from its official publisher onto the machine of
+    whoever runs it, and the terms of that publisher apply to that person and
+    to the data they downloaded. "iban-pizza sources" prints, for every
+    registry, the publisher, where its terms are published and the source
+    statement it asks for; the same is stored with the data and reported by
+    the service at /v2/data.
 
-    Austria: the SEPA payment directory is published by the Oesterreichische
-    Nationalbank (OeNB) and reused here under the Creative Commons Attribution
-    4.0 licence (CC BY 4.0), which the OeNB grants for its website data
-    including commercial use. Source: https://www.oenb.at, (c) OeNB.
+    The terms differ. Some registries are under an open licence (CC BY 4.0 for
+    Austria, Italy and Slovenia). Most are under the publisher's own terms of
+    use, which typically allow use and reproduction with the source named and
+    in several cases forbid passing the data on altered. A few state no terms
+    at all. Anyone who intends to pass downloaded data on to others, rather
+    than use it to run the service, has to check the terms of each registry
+    for that purpose.
 
-    GLEIF BIC-to-LEI data is published under CC0. Terms for the remaining
-    sources differ; see the documentation.
+    Where a registry names an institution's LEI but no BIC, the BIC is joined
+    from the BIC-to-LEI mapping table published by SWIFT and GLEIF. That table
+    is not covered by GLEIF's CC0 dedication; it is licensed under the BIC/LEI
+    Mapping Table License Agreement, which permits any use provided this
+    notice accompanies copies of the table, in whole or in part:
+
+        SWIFT (c) and database rights. All rights reserved. This Mapping Table
+        has been developed by SWIFT. Any use of the Mapping Table, in whole or
+        in part, is subject to the BIC/LEI Mapping Table License Agreement as
+        published with the Mapping Table available on GLEIF's website. The
+        Mapping Table is updated monthly. For the latest BIC information and
+        updates, always refer to www.swift.com/bic.
+
+    The test fixtures under internal/sources/testdata and
+    cmd/iban-pizza/testdata hold a handful of rows in each registry's layout
+    for the parsers' tests. They are not a dataset and are not used at run
+    time.

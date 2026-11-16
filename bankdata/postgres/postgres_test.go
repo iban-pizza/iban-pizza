@@ -362,3 +362,61 @@ func TestReplaceSurvivesASourceRename(t *testing.T) {
 		t.Errorf("holding %d records after the rename, want %d", len(all), len(fixtures()))
 	}
 }
+
+// Provenance is the point of recording a source at all: who published the
+// data, under which terms, and how old the publisher says it is. It has to
+// survive the database unchanged, as must the BIC's origin on a record.
+func TestProvenanceRoundTrip(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+
+	published := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	info := bankdata.SourceInfo{
+		Country:     "FR",
+		Name:        "Provenance Registry",
+		URL:         "https://example.test/list.csv",
+		RetrievedAt: time.Now().UTC().Truncate(time.Second),
+		PublishedAt: published,
+		Licence:     "Example terms",
+		TermsURL:    "https://example.test/terms",
+		Attribution: "Source: Example",
+		Partial:     true,
+	}
+	bank := bankdata.Bank{
+		Country: "FR", BankCode: "99999", Name: "Banque Exemple",
+		BIC: "EXAMFRPPXXX", BICSource: "Example mapping", LEI: "AAAAAAAAAAAAAAAAAA01",
+		Source: info.Name,
+	}
+	if err := store.Replace(ctx, info, []bankdata.Bank{bank}); err != nil {
+		t.Fatalf("Replace: %v", err)
+	}
+
+	got, err := store.Find(ctx, bank.Key())
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if got.BICSource != bank.BICSource || got.LEI != bank.LEI {
+		t.Errorf("record lost its provenance: %+v", got)
+	}
+
+	stats, err := store.Stats(ctx)
+	if err != nil {
+		t.Fatalf("Stats: %v", err)
+	}
+	for _, src := range stats.Sources {
+		if src.Name != info.Name {
+			continue
+		}
+		if src.Licence != info.Licence || src.TermsURL != info.TermsURL || src.Attribution != info.Attribution {
+			t.Errorf("source lost its terms: %+v", src)
+		}
+		if !src.Partial {
+			t.Error("source lost its partial mark")
+		}
+		if !src.PublishedAt.Equal(published) {
+			t.Errorf("PublishedAt = %v, want %v", src.PublishedAt, published)
+		}
+		return
+	}
+	t.Error("the source is missing from Stats")
+}

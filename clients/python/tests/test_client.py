@@ -130,7 +130,7 @@ def test_live_batch_search_registry_data():
     assert many[1]["iban"]["countryCode"] == "AT" and many[1]["checks"]["ibanChecksum"]["ok"] is True
     assert api.banks(bic="COBA", limit=3)
     assert next(c for c in api.countries() if c["code"] == "DE")["hasBankData"] is True
-    assert api.data()["records"] > 1000
+    assert api.data()["records"] > 0
     assert api.health()["status"] in ("ok", "stale")
     assert api.validate_v1("DE89370400440532013000", get_bic=True)["bankData"]["bic"] == "COBADEFFXXX"
     with pytest.raises(IbanPizzaError) as e:

@@ -1,0 +1,32 @@
+name: Check bank data sources
+
+# The repository carries no bank data; users download it from the official
+# registries with "iban-pizza update". What can rot here is therefore not a
+# dataset but the parsers: a publisher renames a column, moves a file or
+# changes a format, and the next user's update fails. This job downloads and
+# parses every registry on a schedule and stores nothing, so such a break
+# shows up as a failed run here before it shows up as a bug report.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Download and parse every registry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27'
+          cache: true
+
+      - name: Dry run of the update
+        run: |
+          go run ./cmd/iban-pizza update -dry-run \
+            -scheme-dir "$RUNNER_TEMP/schemes" -log-format text

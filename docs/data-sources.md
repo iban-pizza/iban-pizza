@@ -1,8 +1,11 @@
 # Data sources
 
-Every endpoint in this document was fetched successfully on **2026-09-02**. Where a
-source is listed as unresolved, that means no free public endpoint has been confirmed
-yet, not that one does not exist.
+Working notes on the pan-European sources and on the traps in the first three
+national registries. The current list of every registry the program downloads,
+with its terms, is in [country-sources.md](country-sources.md); where the two
+disagree, that file is right.
+
+The endpoints in this document were first verified on **2026-09-02**.
 
 Two things are easy to conflate, and the distinction drives the whole design:
 
@@ -25,12 +28,10 @@ enriches the answer once you have it. No pan-European source replaces the nation
 | NL | `betaalvereniging.nl/wp-content/uploads/BIC-lijst-NL.xlsx` | XLSX | continuous | Redirects to a dated path; follow redirects. |
 | CZ | `cnb.cz/cs/platebni-styk/.galleries/ucty_kody_bank/download/kody_bank_CR.csv` | CSV `;`, UTF-8 | continuous | Columns: payment code, provider, BIC, CERTIS flag. **Served with `Content-Type: text/html` despite being CSV**, do not gate parsing on the content type. |
 
-### Unresolved
-`LU` (the old ABBL page is a 404) and the remaining SEPA countries (ES, IT, FR, PT, PL,
-SK, HU, SE, DK, NO, FI, IE, GR, HR, SI, BG, RO, LT, LV, EE, MT, CY, IS, MC, SM, AD, VA, GB).
-Some of these publish freely and simply have not been located yet; others (notably FR and
-GB) have historically charged for their directories. Until a source is confirmed, those
-countries get structural IBAN validation plus Tier 2 enrichment, but no bank code lookup.
+### Further countries
+Belgium and thirteen more countries have been added since; see
+[country-sources.md](country-sources.md) for all of them and for the euro area
+countries that cannot be downloaded automatically.
 
 ## Tier 2: pan-European, BIC keyed (verified live)
 
@@ -38,7 +39,7 @@ countries get structural IBAN validation plus Tier 2 enrichment, but no bank cod
 |---|---|---|---|
 | EPC Register of Participants | `europeanpaymentscouncil.eu/sites/default/files/participants_export/{scheme}/{scheme}.csv` for `sct`, `sct_inst`, `sdd_core`, `sdd_b2b`, `oct_inst`, `vop` | BIC, name, address, city, country, readiness date, leaving date, scheme options | EPC terms |
 | ECB MFI list | daily release linked from `mid.ecb.europa.eu/rss/mid.xml`, files named `mfi_csv_<yymmdd>.csv.gz` | RIAD code, **LEI**, country, name, address, postal, city, category, head office | ECB terms |
-| GLEIF BIC-to-LEI | `mapping.gleif.org/api/v2/bic-lei/<uuid>/download` (UUIDs listed on the GLEIF download page) | `LEI,BIC` pairs | **CC0** |
+| GLEIF BIC-to-LEI | `mapping.gleif.org/api/v2/bic-lei/<uuid>/download` (UUIDs listed on the GLEIF download page) | `LEI,BIC` pairs | BIC/LEI Mapping Table License Agreement (SWIFT notice required), **not CC0** |
 
 Notes that cost time if discovered late:
 
@@ -62,17 +63,25 @@ level and says so; see `internal/sepa`.
 
 ## Licensing
 
-Code and data are separate questions, and the data is the one that matters for
-redistribution.
+Code and data are separate questions. The code is MIT. The data is not part of
+the project at all: nothing is bundled, `iban-pizza update` downloads each
+registry from its publisher, and that publisher's terms apply to whoever ran
+the download.
 
-- **GLEIF**: CC0, unrestricted.
-- **OeNB (AT)**: the CSV header points at the OeNB's disclaimer and copyright terms.
-  Those terms (Impressum und Haftung, section 2.2, under the Austrian
-  Informationsweiterverwendungsgesetz 2022) grant reuse of OeNB website data under
-  **CC BY 4.0**, expressly including commercial use without separate consent.
-  Attribution is required and is given in NOTICE; verified 2026-09-08.
-- **Bundesbank, SIX, NBB, Betaalvereniging, ČNB, EPC, ECB**: each has its own terms of
-  use; review them before redistributing a populated snapshot commercially.
+- **OeNB (AT)**: the OeNB's Impressum und Haftung, section 2.2, grants reuse of
+  OeNB website data under **CC BY 4.0**, commercial use included. Re-verified
+  2026-11-16.
+- **Bundesbank (DE)** and **ČNB (CZ)**: storing, passing on and reproducing is
+  allowed with the source named, and both say the information may not be
+  altered. A converted extract inside a public image is hard to square with
+  that, which is the reason the bundled snapshot was removed.
+- **GLEIF BIC-to-LEI mapping**: GLEIF's LEI data is CC0, the mapping table is
+  not. It carries its own licence from SWIFT and GLEIF, which permits any use
+  provided the SWIFT notice accompanies copies. See `NOTICE`.
+- **ECB**: free use with the source cited and modifications stated. The
+  separate policy for ESCB statistics adds that statistics are not to be
+  modified; whether the MFI list counts as statistics is not settled.
+- **EPC**: terms not reviewed; the site blocks automated requests for them.
 
-Because these terms differ, the build keeps the option of shipping the loader without a
-baked snapshot. See `NOTICE` for the code side.
+The terms of every other registry are summarised in
+[country-sources.md](country-sources.md) and printed by `iban-pizza sources`.

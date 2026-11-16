@@ -21,6 +21,15 @@ type CNB struct{}
 func (CNB) Country() string { return "CZ" }
 func (CNB) Name() string    { return "Ceska narodni banka" }
 
+func (CNB) Terms() Terms {
+	return Terms{
+		Licence:     "CNB disclaimer and copyright",
+		URL:         "https://www.cnb.cz/en/privacy-statement-and-disclaimer/disclaimer-copyright/",
+		Attribution: "Source: the CNB",
+		Note:        "May be stored, distributed and reproduced with the source named; the file and its content may not be altered.",
+	}
+}
+
 func (b CNB) Fetch(ctx context.Context, c *Client) ([]byte, string, error) {
 	data, err := c.Get(ctx, cnbURL)
 	return data, cnbURL, err

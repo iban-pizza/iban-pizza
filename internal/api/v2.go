@@ -54,6 +54,8 @@ type BankView struct {
 	Zip       string    `json:"zip,omitempty"`
 	City      string    `json:"city,omitempty"`
 	BIC       string    `json:"bic,omitempty"`
+	BICSource string    `json:"bicSource,omitempty"`
+	LEI       string    `json:"lei,omitempty"`
 	Source    string    `json:"source,omitempty"`
 	Logo      logo.Logo `json:"logo"`
 }
@@ -191,13 +193,20 @@ func (s *Server) lookupBank(ctx context.Context, parsed *iban.IBAN, checks map[s
 			return nil
 		}
 		// No data for the country at all is a different statement from a bank
-		// code that is genuinely unknown within a country that is covered.
-		if !s.haveCountry(ctx, parsed.CountryCode()) {
+		// code that is genuinely unknown within a country that is covered,
+		// and a registry known to have gaps is a third: there the code may
+		// well belong to an institution the registry leaves out.
+		switch s.coverage(ctx, parsed.CountryCode()) {
+		case coverageNone:
 			checks["bankCode"] = unchecked(
 				"No bank directory is loaded for " + parsed.CountryCode())
-			return nil
+		case coveragePartial:
+			checks["bankCode"] = unchecked(
+				"Bank code " + code + " is not in the directory loaded for " +
+					parsed.CountryCode() + ", which does not list every institution")
+		default:
+			checks["bankCode"] = notOK("Unknown bank code " + code)
 		}
-		checks["bankCode"] = notOK("Unknown bank code " + code)
 		return nil
 	}
 
@@ -235,16 +244,36 @@ func (s *Server) accountCheck(bank bankdata.Bank, account string) Check {
 
 // haveCountry reports whether any bank data is loaded for a country.
 func (s *Server) haveCountry(ctx context.Context, country string) bool {
+	return s.coverage(ctx, country) != coverageNone
+}
+
+// coverage says how far a missing bank code can be trusted for a country.
+type coverage int
+
+const (
+	coverageNone    coverage = iota // no registry loaded
+	coveragePartial                 // a registry known to have gaps
+	coverageFull                    // a registry that lists every bank code
+)
+
+func (s *Server) coverage(ctx context.Context, country string) coverage {
 	stats, err := s.cfg.Repo.Stats(ctx)
 	if err != nil {
-		return false
+		return coverageNone
 	}
+	result := coverageNone
 	for _, src := range stats.Sources {
-		if src.Country == country {
-			return true
+		if src.Country != country {
+			continue
 		}
+		// One complete registry settles it, whatever else is loaded for the
+		// same country.
+		if !src.Partial {
+			return coverageFull
+		}
+		result = coveragePartial
 	}
-	return false
+	return result
 }
 
 // allChecksPass reports whether no check failed. Unchecked entries do not
@@ -267,6 +296,8 @@ func (s *Server) bankView(b bankdata.Bank) *BankView {
 		Zip:       b.Zip,
 		City:      b.City,
 		BIC:       b.BIC,
+		BICSource: b.BICSource,
+		LEI:       b.LEI,
 		Source:    b.Source,
 		Logo:      s.cfg.Logos.For(b.Country, b.BankCode, b.BIC, b.Name),
 	}

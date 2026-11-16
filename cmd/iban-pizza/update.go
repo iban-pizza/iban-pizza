@@ -22,9 +22,12 @@ func runUpdate(ctx context.Context, args []string) error {
 
 	only := fs.String("countries", "", "comma separated country codes to refresh, default all")
 	dryRun := fs.Bool("dry-run", false, "download and parse but do not store anything")
+	allowPartial := fs.Bool("allow-partial", false,
+		"exit successfully when at least one registry was downloaded, for unattended first starts")
 	snapshotPath := fs.String("write-snapshot", "",
-		"also write the result to this snapshot file")
-	schemeDir := fs.String("scheme-dir", "", "also refresh the EPC scheme register into this directory")
+		"also write the result to this additional file")
+	schemeDir := fs.String("scheme-dir", envOr("IBAN_PIZZA_SCHEME_FILE", ""),
+		"also download the EPC scheme register into this directory")
 	logFormat := fs.String("log-format", envOr("IBAN_PIZZA_LOG_FORMAT", "text"), "json or text")
 	logLevel := fs.String("log-level", envOr("IBAN_PIZZA_LOG_LEVEL", "info"), "debug, info, warn or error")
 
@@ -35,12 +38,17 @@ func runUpdate(ctx context.Context, args []string) error {
 	log := newLogger(*logFormat, *logLevel)
 	client := sources.NewClient()
 
+	// The data is downloaded to this machine from each publisher, under that
+	// publisher's terms. Say so once per run, where an operator will see it.
+	log.Info("downloading from the official registries; each publisher's terms apply to the data, " +
+		"see \"iban-pizza sources\"")
+
 	selected, err := selectSources(*only)
 	if err != nil {
 		return err
 	}
 
-	repo, writer, closeStore, err := data.openWritableStore(ctx, log)
+	repo, writer, save, closeStore, err := data.openWritableStore(ctx, log)
 	if err != nil {
 		return err
 	}
@@ -62,17 +70,33 @@ func runUpdate(ctx context.Context, args []string) error {
 			log.Error("update failed", "country", res.Country, "source", res.Source, "error", res.Err)
 			continue
 		}
-		log.Info("updated",
+		if res.Warning != "" {
+			log.Warn(res.Warning, "country", res.Country, "source", res.Source)
+		}
+		attrs := []any{
 			"country", res.Country,
 			"source", res.Source,
 			"records", res.Records,
-			"took", time.Since(start).Round(time.Millisecond))
+			"took", time.Since(start).Round(time.Millisecond),
+		}
+		if res.BICsJoined > 0 {
+			attrs = append(attrs, "bicsJoined", res.BICsJoined)
+		}
+		log.Info("updated", attrs...)
 	}
 
 	if *schemeDir != "" {
 		if err := updateSchemes(ctx, client, *schemeDir, *dryRun, log); err != nil {
 			failed++
 			log.Error("scheme register update failed", "error", err)
+		}
+	}
+
+	// Save before reporting failures: the registries that did download are
+	// worth keeping even when another publisher was unreachable.
+	if !*dryRun {
+		if err := save(ctx); err != nil {
+			return err
 		}
 	}
 
@@ -86,6 +110,11 @@ func runUpdate(ctx context.Context, args []string) error {
 	}
 
 	if failed > 0 {
+		if *allowPartial && failed < len(selected) {
+			log.Warn("some registries could not be downloaded, continuing with the rest",
+				"failed", failed, "of", len(selected))
+			return nil
+		}
 		return fmt.Errorf("%d of %d sources failed", failed, len(selected))
 	}
 	return nil
@@ -156,5 +185,6 @@ func updateSchemes(ctx context.Context, client *sources.Client, dir string, dryR
 // logger is the subset of slog.Logger this file needs.
 type logger interface {
 	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
 	Error(msg string, args ...any)
 }

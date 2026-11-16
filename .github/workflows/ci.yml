@@ -94,7 +94,13 @@ jobs:
       - name: Build and start the service
         run: |
           CGO_ENABLED=0 go build -o /tmp/iban-pizza ./cmd/iban-pizza
-          /tmp/iban-pizza serve -addr 127.0.0.1:8080 -log-format text &
+          # The repository carries no bank data, and a test run must not
+          # depend on the publishers being reachable. The two records the
+          # client tests ask about are loaded from a hand written file.
+          /tmp/iban-pizza import -country DE -format generic \
+            -file cmd/iban-pizza/testdata/banks.csv -data-file /tmp/bankdata.jsonl.gz
+          /tmp/iban-pizza serve -addr 127.0.0.1:8080 -log-format text \
+            -data-file /tmp/bankdata.jsonl.gz &
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:8080/readyz >/dev/null && break; sleep 0.5; done
           curl -sf http://127.0.0.1:8080/readyz
 
@@ -142,11 +148,34 @@ jobs:
       - name: Build
         run: CGO_ENABLED=0 go build -trimpath -o /tmp/iban-pizza ./cmd/iban-pizza
 
-      # The binary has to answer correctly with no configuration at all,
-      # because that is the whole point of the embedded snapshot.
-      - name: Smoke test the zero configuration start
+      # The binary ships without bank data. Before any is downloaded it has
+      # to start anyway, validate the structure of an IBAN, and say plainly
+      # that it is not ready to resolve banks.
+      - name: Smoke test the start without data
         run: |
-          /tmp/iban-pizza serve -addr 127.0.0.1:8080 -log-format text &
+          /tmp/iban-pizza serve -addr 127.0.0.1:8081 -log-format text \
+            -data-file /tmp/absent.jsonl.gz &
+          pid=$!
+          trap 'kill $pid' EXIT
+
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8081/healthz >/dev/null && break
+            sleep 0.5
+          done
+
+          echo "A structurally valid IBAN must still validate:"
+          curl -sf http://127.0.0.1:8081/v2/iban/DE89370400440532013000 \
+            | grep -q '"valid":true'
+
+          echo "Readiness must report that no bank data is loaded:"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/readyz)" = 503
+
+      - name: Smoke test the start with data
+        run: |
+          /tmp/iban-pizza import -country DE -format generic \
+            -file cmd/iban-pizza/testdata/banks.csv -data-file /tmp/bankdata.jsonl.gz
+          /tmp/iban-pizza serve -addr 127.0.0.1:8080 -log-format text \
+            -data-file /tmp/bankdata.jsonl.gz &
           pid=$!
           trap 'kill $pid' EXIT
 

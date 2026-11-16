@@ -13,7 +13,7 @@
 <h3 align="center">IBAN validation, bank lookup and SEPA schemes as one binary</h3>
 
 <p align="center">
-  Bank data compiled in. No database, no configuration. Self-host with Docker or a single static binary.
+  No database required. Bank data comes straight from the official registries, downloaded by you with one command. Self-host with Docker or a single static binary.
 </p>
 
 <p align="center">
@@ -29,12 +29,22 @@ A ground up rewrite of the [goiban](https://github.com/apilayer/goiban) family
 of projects, whose last release was in 2019.
 
 ```
-docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:0.2.0
+git clone https://github.com/iban-pizza/iban-pizza && cd iban-pizza
+docker compose up
 curl http://localhost:8080/v2/iban/DE89370400440532013000
 ```
 
-No database, no data directory, no configuration. The bank data is compiled
-into the binary, so nothing has to be downloaded before the first request.
+The first start downloads the bank registries from their official publishers
+into a volume, then serves from them. Nothing else is needed: no database, no
+configuration.
+
+**No bank data ships with this project.** Every registry has its own terms of
+use, and most let you download and use the data but do not let a project hand
+it on. So the repository, the binaries and the image contain parsers only, and
+`iban-pizza update` fetches the data onto the machine that uses it. The terms
+of each publisher apply to what you download; `iban-pizza sources` lists them.
+Until the data is there, the service validates the structure and check digits
+of an IBAN and resolves no bank.
 
 While this repository is private, its image is private too and `docker pull`
 needs a login with the `read:packages` scope; the released binaries do not. See
@@ -49,7 +59,7 @@ needs a login with the `read:packages` scope; the released binaries do not. See
   verified against `SHA256SUMS`, run with one command. Includes a systemd unit.
 - **Docker and Compose**, standalone or with PostgreSQL.
 - **Kubernetes**, from the manifests in `deploy/kubernetes/`.
-- **Keeping the data current**, and what is and is not compiled in.
+- **Downloading the data and keeping it current.**
 
 Releases are built by GitHub Actions from a tag: static binaries for Linux,
 macOS and Windows, a multi architecture container image on GHCR, and a
@@ -148,17 +158,34 @@ default.
 
 Bank data comes from official national registries.
 
-- [docs/country-sources.md](docs/country-sources.md) has the status of all 36
-  SEPA countries: which publish a free machine readable bank code registry,
-  which publish only a PDF, which sell it, and which are still unresearched.
-- [docs/data-sources.md](docs/data-sources.md) has the working detail for the
-  sources in use, including the encoding and layout traps.
+- [docs/country-sources.md](docs/country-sources.md) lists every registry the
+  program downloads, with its terms, and the euro area countries it cannot
+  cover and why.
+- [docs/data-sources.md](docs/data-sources.md) has working notes on the
+  pan-European sources and the layout traps of the first registries.
 
-Currently loaded: Germany (Bundesbank), Austria (OeNB), Czech Republic (CNB),
-plus the EPC Register of Participants for all six SEPA schemes. Six more
-countries have a verified free source waiting on a spreadsheet reader:
-Switzerland and Liechtenstein, Belgium, the Netherlands, Norway, Hungary and
-Latvia.
+`iban-pizza update` downloads a registry for these countries:
+
+Austria, Belgium, Bulgaria, Croatia, Cyprus, the Czech Republic, Finland,
+France, Germany, Greece, Italy, Luxembourg, Malta, Portugal, Slovakia, Slovenia
+and Spain: 16 of the 21 euro area countries, each from its central bank,
+supervisor or banking association,
+plus the EPC Register of Participants for all six SEPA schemes, which is what
+answers whether an institution takes part in SEPA Credit Transfer, Instant
+Credit Transfer and Direct Debit (core and B2B). Run `iban-pizza sources` for
+the publisher, terms of use and required source statement of each.
+
+Some registries name a bank and its LEI but no BIC. For those the BIC is joined
+from the BIC-to-LEI mapping published by SWIFT and GLEIF, and the answer says
+so in `bicSource`. A BIC is only filled in when the mapping identifies exactly
+one institution code in the country; an ambiguous one is left empty rather
+than guessed.
+
+Not downloaded automatically: the Netherlands and Estonia, whose publishers
+restrict the list to personal or non commercial use, Ireland and Lithuania,
+whose files sit behind a captcha or a bot check, and Latvia, which publishes a
+legacy binary spreadsheet. If you hold the data under your own agreement, load
+it with `iban-pizza import`.
 
 Resolving the bank code inside an IBAN needs a national registry. Pan-European
 sources such as the EPC register, the ECB MFI list and GLEIF are keyed by BIC
@@ -180,24 +207,33 @@ repository, and the loader became a subcommand of the same binary.
 | `goiban-data-loader` | `internal/sources/` plus `iban-pizza update` |
 | `goiban-service` | `internal/api/` plus `iban-pizza serve` |
 
-### Three ways data gets in
+### How data gets in
 
-**1. Do nothing.** A snapshot of every registry is compiled into the binary,
-so `iban-pizza serve` answers immediately. The whole dataset is about 110 KB
-compressed for 4,423 institutions. This is the default and needs no network, no
-file and no database.
-
-**2. Refresh into a file**, when data should be newer than the binary:
+**1. Download into a file.** This is the default:
 
 ```sh
-# The file does not have to exist. update creates it, and the directory too.
-iban-pizza update --write-snapshot /var/lib/iban-pizza/data.gz
-iban-pizza serve  -data-file /var/lib/iban-pizza/data.gz
+iban-pizza sources   # who publishes what, under which terms
+iban-pizza update    # downloads into data/bankdata.jsonl.gz
+iban-pizza serve
 ```
 
-No rebuild is involved. `--countries DE,AT` refreshes a subset, and `--dry-run`
-downloads and parses without storing, which is the safe way to check whether a
-registry has changed its format.
+`-data-file`, or `IBAN_PIZZA_DATA_FILE`, moves the file; the container image
+sets it to `/data/bankdata.jsonl.gz`. `-countries DE,AT` downloads a subset,
+and `-dry-run` downloads and parses without storing, which is the safe way to
+check whether a registry has changed its format. Run `update` again whenever
+the data should be newer, then restart the service to load it.
+
+Without the file the service still starts. It validates structure and check
+digits, reports the bank code as unchecked, and answers `/readyz` with 503
+until data is loaded.
+
+**2. Copy one download to other machines**, when only one host may reach the
+publishers:
+
+```sh
+iban-pizza update -data-file bankdata.jsonl.gz          # where egress is allowed
+iban-pizza import -snapshot bankdata.jsonl.gz -database-url postgres://...
+```
 
 **3. Refresh into PostgreSQL**, for central maintenance across instances:
 
@@ -208,8 +244,8 @@ iban-pizza serve  -database-url postgres://user:pass@host/iban
 
 There is no separate step to enable PostgreSQL. Passing `-database-url`, or
 setting `IBAN_PIZZA_DATABASE_URL`, is the whole switch. The schema is created on
-connect, so an empty database is enough to start, and the loader has to run
-once before the service can answer anything.
+connect, so an empty database is enough to start, and `update` has to run once
+before the service can resolve a bank.
 
 With Compose that is one command:
 
@@ -217,11 +253,11 @@ With Compose that is one command:
 docker compose -f compose.yaml -f compose.postgres.yaml up
 ```
 
-which starts PostgreSQL, runs the loader once, and then starts the service
-against it. Refresh later without touching the service:
+which starts PostgreSQL, downloads the registries into it once, and then
+starts the service against it. Refresh later without touching the service:
 
 ```sh
-docker compose -f compose.yaml -f compose.postgres.yaml run --rm loader
+docker compose -f compose.yaml -f compose.postgres.yaml run --rm data
 ```
 
 In every case `iban-pizza update` resolves the download links from the
@@ -235,37 +271,39 @@ take the others down with it.
 iban-pizza import -country DE -file blz-aktuell.txt -database-url postgres://...
 ```
 
-Built in parsers cover the countries in the snapshot; every other country
+Built in parsers cover the countries listed above; every other country
 accepts a generic CSV with a `bankCode,name,...` header. Details in the
 [deployment guide](docs/deployment.md#importing-a-file-you-already-have).
 
-To refresh the snapshot that ships inside the binary, write it back to its
-source location and rebuild:
-
-```sh
-make update    # writes internal/embedded/snapshot.jsonl.gz
-make build
-```
-
-The scheduled `data-refresh` workflow does exactly this every quarter and opens
-a pull request with the result.
+The scheduled `check-sources` workflow downloads and parses every registry each
+week and stores nothing, so a publisher changing its format shows up as a
+failed run in this repository before it reaches a user.
 
 ## Running it
 
 ### Container
 
 ```sh
-docker run -p 8080:8080 ghcr.io/iban-pizza/iban-pizza:latest
+docker compose up
+```
+
+or, without Compose, with a volume that holds the downloaded data:
+
+```sh
+docker volume create bankdata
+docker run --rm -v bankdata:/data ghcr.io/iban-pizza/iban-pizza:latest update
+docker run -p 8080:8080 -v bankdata:/data ghcr.io/iban-pizza/iban-pizza:latest
 ```
 
 The image is built `FROM scratch`, runs as uid 65534, and contains the binary
-and certificate roots and nothing else.
+and certificate roots and no bank data.
 
 ### Binary
 
 ```sh
-iban-pizza serve                       # embedded snapshot, no configuration
-iban-pizza serve -data-file data.gz    # a snapshot refreshed without a rebuild
+iban-pizza update                      # download the registries once
+iban-pizza serve                       # serves data/bankdata.jsonl.gz
+iban-pizza serve -data-file data.gz    # a data file somewhere else
 iban-pizza serve -database-url postgres://...
 ```
 
@@ -274,7 +312,7 @@ Flags, each with an `IBAN_PIZZA_`-prefixed environment variable equivalent:
 | Flag | Default | Purpose |
 |---|---|---|
 | `-addr` | `:8080` | listen address |
-| `-data-file` | | snapshot file, overrides the embedded one |
+| `-data-file` | `data/bankdata.jsonl.gz` | data file written by `iban-pizza update` |
 | `-database-url` | | PostgreSQL connection string |
 | `-scheme-file` | | directory of EPC exports, enables the schemes block |
 | `-cors-origins` | none | comma separated origins, or `*` |
@@ -286,8 +324,7 @@ Flags, each with an `IBAN_PIZZA_`-prefixed environment variable equivalent:
 ### Refreshing the data
 
 ```sh
-iban-pizza update --write-snapshot internal/embedded/snapshot.jsonl.gz \
-                --scheme-dir data/schemes
+iban-pizza update -scheme-dir data/schemes
 ```
 
 Download links are resolved at run time rather than hard coded, because the
@@ -332,7 +369,7 @@ make cover    # coverage summary
 make lint     # gofmt and go vet
 make vuln     # govulncheck
 make build    # static binary into bin/
-make update   # refresh the data and the embedded snapshot
+make update   # download the registries into ./data (not checked in)
 make docker   # build the image
 ```
 
@@ -352,8 +389,7 @@ internal/sepa/        EPC Register of Participants
 internal/checkdigit/  German account check digit methods
 internal/logo/        Brand mapping and monogram generation
 internal/api/         v1 compatibility surface, v2, middleware, interface
-internal/embedded/    The bank data snapshot compiled into the binary
-cmd/iban-pizza/         serve, update, snapshot, version
+cmd/iban-pizza/       serve, update, sources, import, snapshot, version
 ```
 
 `iban` and `bankdata` are public packages, so the core stays importable as a

@@ -1,0 +1,3 @@
+bankCode,name,bic,zip,city,shortName,checkAlgo,country
+37040044,Commerzbank,COBADEFFXXX,50447,Köln,Commerzbank Köln,13,DE
+50010517,ING-DiBa,INGDDEFFXXX,60628,Frankfurt am Main,ING-DiBa,C1,DE

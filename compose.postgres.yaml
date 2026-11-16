@@ -3,15 +3,12 @@
 #
 #     docker compose -f compose.yaml -f compose.postgres.yaml up
 #
-# The loader copies the reviewed snapshot out of the image into the database
-# and exits. It never contacts a publisher, so the stack needs no outbound
-# network. To fetch from the publishers directly, replace "import -snapshot
-# embedded" with "update"; that is fresher at the cost of egress from the host.
-#
-# The loader runs once and exits. Run it again at any time to
+# The image contains no bank data. Here the "data" service of the base file
+# downloads the registries from their official publishers straight into the
+# database instead of into a file, and exits. Run it again at any time to
 # refresh the data without touching the service:
 #
-#     docker compose -f compose.yaml -f compose.postgres.yaml run --rm loader
+#     docker compose -f compose.yaml -f compose.postgres.yaml run --rm data
 #
 # This is an override rather than a profile because both variants would
 # otherwise publish the same port and collide.
@@ -23,26 +20,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      # The database starts empty, so it has to be filled before the service
-      # can answer anything.
-      loader:
-        condition: service_completed_successfully
 
-  loader:
-    image: ghcr.io/iban-pizza/iban-pizza:latest
-    build: .
-    command:
-      - import
-      - -snapshot
-      - embedded
-      - -database-url
-      - postgres://ibanpizza:ibanpizza@db:5432/ibanpizza?sslmode=disable
-      - -log-format
-      - text
+  data:
+    environment:
+      IBAN_PIZZA_DATABASE_URL: postgres://ibanpizza:ibanpizza@db:5432/ibanpizza?sslmode=disable
     depends_on:
       db:
         condition: service_healthy
-    restart: "no"
 
   db:
     image: postgres:17-alpine

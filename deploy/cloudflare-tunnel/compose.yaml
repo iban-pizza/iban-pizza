@@ -12,9 +12,28 @@
 # token it shows. The token is the only secret and never needs to change when
 # the image is updated.
 
+# The image contains no bank data. The "data" service downloads the registries
+# from their official publishers into a volume on the first start. Refresh
+# with:
+#
+#     docker compose -f deploy/cloudflare-tunnel/compose.yaml run --rm data
+#     docker compose -f deploy/cloudflare-tunnel/compose.yaml restart iban-pizza
+
 services:
+  data:
+    image: ghcr.io/iban-pizza/iban-pizza:0.3.0
+    command: ["update", "-allow-partial", "-log-format", "json"]
+    volumes:
+      - bankdata:/data
+    restart: "no"
+
   iban-pizza:
-    image: ghcr.io/iban-pizza/iban-pizza:0.2.0
+    image: ghcr.io/iban-pizza/iban-pizza:0.3.0
+    volumes:
+      - bankdata:/data
+    depends_on:
+      data:
+        condition: service_completed_successfully
     # Not published on the host. Only cloudflared, on the same network, can
     # reach it.
     expose:
@@ -35,3 +54,6 @@ services:
     depends_on:
       - iban-pizza
     restart: unless-stopped
+
+volumes:
+  bankdata:

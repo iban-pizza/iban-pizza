@@ -4,4 +4,4 @@
 docs
 Makefile
 .dockerignore
-data/schemes
+data

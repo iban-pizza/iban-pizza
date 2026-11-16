@@ -65,11 +65,43 @@ func parseCSV(text string, sep rune, mustContain ...string) (*csvTable, error) {
 	return &csvTable{columns: columns, rows: records[1:]}, nil
 }
 
+// tableFromRows builds a table from rows that are already split into cells,
+// as a spreadsheet or an HTML table delivers them. The header row is located
+// the same way parseCSV does, by content.
+func tableFromRows(rows [][]string, mustContain ...string) (*csvTable, error) {
+	for i, row := range rows {
+		joined := normaliseHeader(strings.Join(row, "|"))
+		ok := true
+		for _, want := range mustContain {
+			if !strings.Contains(joined, normaliseHeader(want)) {
+				ok = false
+				break
+			}
+		}
+		if !ok {
+			continue
+		}
+		if i+1 >= len(rows) {
+			return nil, fmt.Errorf("no data rows below the header")
+		}
+		columns := make(map[string]int, len(row))
+		for j, name := range row {
+			if key := normaliseHeader(name); key != "" {
+				if _, dup := columns[key]; !dup {
+					columns[key] = j
+				}
+			}
+		}
+		return &csvTable{columns: columns, rows: rows[i+1:]}, nil
+	}
+	return nil, fmt.Errorf("no header row containing %v", mustContain)
+}
+
 // normaliseHeader lowercases and strips spaces so that "SWIFT-Code" and
 // "swift code" resolve to the same column.
 func normaliseHeader(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.NewReplacer(" ", "", "-", "", "_", "", ".", "").Replace(s)
+	s = strings.NewReplacer(" ", "", "-", "", "_", "", ".", "", "\n", "", "\r", "", "\t", "").Replace(s)
 	return s
 }
 

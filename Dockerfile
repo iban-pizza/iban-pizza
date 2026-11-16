@@ -20,11 +20,18 @@ RUN CGO_ENABLED=0 go build \
         -o /iban-pizza \
         ./cmd/iban-pizza
 
+# The runtime image has no shell to create a directory with, so the data
+# directory is made here and copied across with its ownership.
+RUN mkdir /data
+
 # Runtime stage.
 #
 # scratch holds nothing but the binary: no shell, no package manager, no libc,
-# so there is nothing to exploit and nothing to patch. The bank data is
-# compiled into the binary, which is what makes this possible.
+# so there is nothing to exploit and nothing to patch.
+#
+# The image contains no bank data. Each registry has its own terms of use, and
+# most let a user download and use the data but not a project hand it on.
+# "iban-pizza update" downloads it into /data on the machine that runs it.
 FROM scratch
 
 # Certificate roots, needed by "iban-pizza update" to reach the registries.
@@ -33,6 +40,14 @@ COPY --from=build /iban-pizza /iban-pizza
 # The MIT licence requires the notices to accompany copies of the software;
 # the image is a copy.
 COPY LICENSE NOTICE /
+
+# Where "iban-pizza update" writes and "iban-pizza serve" reads. Mount a
+# volume here so the data outlives the container. The directory is owned by
+# the unprivileged user below, and a fresh named volume inherits that.
+COPY --from=build --chown=65534:65534 /data /data
+ENV IBAN_PIZZA_DATA_FILE=/data/bankdata.jsonl.gz \
+    IBAN_PIZZA_SCHEME_FILE=/data/schemes
+VOLUME /data
 
 # An unprivileged, non existent user. scratch has no /etc/passwd, so the
 # numeric form is the only one that works.

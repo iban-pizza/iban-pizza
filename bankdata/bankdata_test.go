@@ -353,3 +353,51 @@ func TestCopySourcesRefusesEmptySource(t *testing.T) {
 		t.Error("CopySources copied a source with no records")
 	}
 }
+
+// The data file is what "iban-pizza update" leaves behind, so everything
+// recorded about a source and a record has to come back out of it.
+func TestSnapshotKeepsProvenance(t *testing.T) {
+	ctx := context.Background()
+	published := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+
+	s := NewMemoryStore()
+	info := SourceInfo{
+		Country: "FR", Name: "Provenance Registry", RetrievedAt: time.Now().UTC(),
+		PublishedAt: published, Licence: "Example terms",
+		TermsURL: "https://example.test/terms", Attribution: "Source: Example",
+	}
+	bank := Bank{
+		Country: "FR", BankCode: "99999", Name: "Banque Exemple",
+		BIC: "EXAMFRPPXXX", BICSource: "Example mapping", LEI: "AAAAAAAAAAAAAAAAAA01",
+		Source: info.Name,
+	}
+	if err := s.Replace(ctx, info, []Bank{bank}); err != nil {
+		t.Fatalf("Replace returned %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), "data.jsonl.gz")
+	if err := SaveSnapshotFile(ctx, path, s); err != nil {
+		t.Fatalf("SaveSnapshotFile returned %v", err)
+	}
+	loaded, err := LoadSnapshotFile(path)
+	if err != nil {
+		t.Fatalf("LoadSnapshotFile returned %v", err)
+	}
+
+	got, err := loaded.Find(ctx, bank.Key())
+	if err != nil {
+		t.Fatalf("Find returned %v", err)
+	}
+	if got.BICSource != bank.BICSource || got.LEI != bank.LEI {
+		t.Errorf("record lost its provenance: %+v", got)
+	}
+	stats, _ := loaded.Stats(ctx)
+	if len(stats.Sources) != 1 {
+		t.Fatalf("got %d sources, want 1", len(stats.Sources))
+	}
+	src := stats.Sources[0]
+	if src.Licence != info.Licence || src.TermsURL != info.TermsURL ||
+		src.Attribution != info.Attribution || !src.PublishedAt.Equal(published) {
+		t.Errorf("source lost its provenance: %+v", src)
+	}
+}

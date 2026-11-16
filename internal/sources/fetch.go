@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"regexp"
 	"time"
 )
@@ -21,15 +22,23 @@ const userAgent = "iban.pizza data updater (+https://iban.pizza)"
 // Client fetches source files over HTTP.
 type Client struct {
 	HTTP *http.Client
+
+	// bics caches the BIC mapping for the length of one update run, so that
+	// several registries which need it share one download.
+	bics bicCache
 }
 
 // NewClient returns a Client with timeouts set. The default http.Client has no
 // timeout at all, which would let one unresponsive publisher hang an update
 // run indefinitely.
 func NewClient() *Client {
+	// One publisher only serves its export after setting a session cookie on
+	// a redirect, so the client keeps cookies for the length of a run.
+	jar, _ := cookiejar.New(nil)
 	return &Client{
 		HTTP: &http.Client{
 			Timeout: 2 * time.Minute,
+			Jar:     jar,
 		},
 	}
 }

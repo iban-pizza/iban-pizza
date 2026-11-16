@@ -4,7 +4,29 @@ import (
 	"bytes"
 	"strings"
 	"unicode/utf8"
+
+	"golang.org/x/text/encoding/charmap"
 )
+
+// DecodeCharmap converts bytes in a single byte code page to UTF-8. Bytes that
+// are already valid UTF-8 are returned unchanged, because publishers have
+// switched to UTF-8 without notice before and decoding it a second time would
+// corrupt every non ASCII character.
+//
+// The registries outside western Europe use Windows-1250 (central Europe),
+// Windows-1253 (Greek) and Windows-1257 (Baltic), none of which Latin-1 can
+// stand in for.
+func DecodeCharmap(b []byte, cm *charmap.Charmap) string {
+	b = bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF})
+	if utf8.Valid(b) {
+		return string(b)
+	}
+	out, err := cm.NewDecoder().Bytes(b)
+	if err != nil {
+		return DecodeLatin1(b)
+	}
+	return string(out)
+}
 
 // DecodeLatin1 converts ISO-8859-1 bytes to UTF-8.
 //

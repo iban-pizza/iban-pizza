@@ -52,6 +52,16 @@ CREATE TABLE IF NOT EXISTS bank (
     PRIMARY KEY (country, bank_code)
 );
 
+-- Columns added after the first release. ADD COLUMN IF NOT EXISTS makes the
+-- schema converge on an existing database without a migration tool.
+ALTER TABLE bank ADD COLUMN IF NOT EXISTS bic_source TEXT NOT NULL DEFAULT '';
+ALTER TABLE bank ADD COLUMN IF NOT EXISTS lei TEXT NOT NULL DEFAULT '';
+ALTER TABLE bank_source ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+ALTER TABLE bank_source ADD COLUMN IF NOT EXISTS licence TEXT NOT NULL DEFAULT '';
+ALTER TABLE bank_source ADD COLUMN IF NOT EXISTS terms_url TEXT NOT NULL DEFAULT '';
+ALTER TABLE bank_source ADD COLUMN IF NOT EXISTS attribution TEXT NOT NULL DEFAULT '';
+ALTER TABLE bank_source ADD COLUMN IF NOT EXISTS partial BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE INDEX IF NOT EXISTS bank_bic_idx ON bank (bic) WHERE bic <> '';
 CREATE INDEX IF NOT EXISTS bank_source_idx ON bank (source);
 `
@@ -83,12 +93,12 @@ func Open(ctx context.Context, url string) (*Store, error) {
 // Close releases the connection pool.
 func (s *Store) Close() { s.pool.Close() }
 
-const selectColumns = `country, bank_code, name, short_name, zip, city, bic, check_algo, source`
+const selectColumns = `country, bank_code, name, short_name, zip, city, bic, check_algo, source, bic_source, lei`
 
 func scanBank(row pgx.Row) (bankdata.Bank, error) {
 	var b bankdata.Bank
 	err := row.Scan(&b.Country, &b.BankCode, &b.Name, &b.ShortName,
-		&b.Zip, &b.City, &b.BIC, &b.CheckAlgo, &b.Source)
+		&b.Zip, &b.City, &b.BIC, &b.CheckAlgo, &b.Source, &b.BICSource, &b.LEI)
 	return b, err
 }
 
@@ -195,16 +205,25 @@ func (s *Store) Stats(ctx context.Context) (bankdata.Stats, error) {
 	}
 
 	rows, err := s.pool.Query(ctx,
-		`SELECT country, name, url, retrieved_at, record_count FROM bank_source ORDER BY country`)
+		`SELECT country, name, url, retrieved_at, record_count,
+		        published_at, licence, terms_url, attribution, partial
+		 FROM bank_source ORDER BY country, name`)
 	if err != nil {
 		return st, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var src bankdata.SourceInfo
-		if err := rows.Scan(&src.Country, &src.Name, &src.URL, &src.RetrievedAt, &src.RecordCount); err != nil {
+		var (
+			src       bankdata.SourceInfo
+			published *time.Time
+		)
+		if err := rows.Scan(&src.Country, &src.Name, &src.URL, &src.RetrievedAt, &src.RecordCount,
+			&published, &src.Licence, &src.TermsURL, &src.Attribution, &src.Partial); err != nil {
 			return st, err
+		}
+		if published != nil {
+			src.PublishedAt = published.UTC()
 		}
 		st.Sources = append(st.Sources, src)
 	}
@@ -231,7 +250,7 @@ func (s *Store) Replace(ctx context.Context, info bankdata.SourceInfo, banks []b
 		country := strings.ToUpper(b.Country)
 		rowsIn = append(rowsIn, []any{
 			country, b.BankCode, b.Name, b.ShortName,
-			b.Zip, b.City, b.BIC, b.CheckAlgo, info.Name,
+			b.Zip, b.City, b.BIC, b.CheckAlgo, info.Name, b.BICSource, b.LEI,
 		})
 		countries = append(countries, country)
 		codes = append(codes, b.BankCode)
@@ -255,21 +274,32 @@ func (s *Store) Replace(ctx context.Context, info bankdata.SourceInfo, banks []b
 	}
 	if _, err := tx.CopyFrom(ctx,
 		pgx.Identifier{"bank"},
-		[]string{"country", "bank_code", "name", "short_name", "zip", "city", "bic", "check_algo", "source"},
+		[]string{"country", "bank_code", "name", "short_name", "zip", "city", "bic", "check_algo", "source", "bic_source", "lei"},
 		pgx.CopyFromRows(rowsIn),
 	); err != nil {
 		return fmt.Errorf("insert banks: %w", err)
 	}
 
+	var published *time.Time
+	if !info.PublishedAt.IsZero() {
+		published = &info.PublishedAt
+	}
 	if _, err := tx.Exec(ctx, `
-        INSERT INTO bank_source (name, country, url, retrieved_at, record_count)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO bank_source (name, country, url, retrieved_at, record_count,
+                                 published_at, licence, terms_url, attribution, partial)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (name) DO UPDATE SET
             country = EXCLUDED.country,
             url = EXCLUDED.url,
             retrieved_at = EXCLUDED.retrieved_at,
-            record_count = EXCLUDED.record_count`,
+            record_count = EXCLUDED.record_count,
+            published_at = EXCLUDED.published_at,
+            licence = EXCLUDED.licence,
+            terms_url = EXCLUDED.terms_url,
+            attribution = EXCLUDED.attribution,
+            partial = EXCLUDED.partial`,
 		info.Name, strings.ToUpper(info.Country), info.URL, info.RetrievedAt, len(banks),
+		published, info.Licence, info.TermsURL, info.Attribution, info.Partial,
 	); err != nil {
 		return fmt.Errorf("record source: %w", err)
 	}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"time"
 )
 
@@ -74,9 +75,14 @@ type DataSource struct {
 	Name        string `json:"name"`
 	URL         string `json:"url,omitempty"`
 	RetrievedAt string `json:"retrievedAt"`
+	PublishedAt string `json:"publishedAt,omitempty"`
 	AgeDays     int    `json:"ageDays"`
 	Records     int    `json:"records"`
 	Stale       bool   `json:"stale"`
+	Licence     string `json:"licence,omitempty"`
+	TermsURL    string `json:"termsUrl,omitempty"`
+	Attribution string `json:"attribution,omitempty"`
+	Partial     bool   `json:"partial,omitempty"`
 }
 
 // DataSchemes describes the loaded EPC register.
@@ -123,8 +129,19 @@ func (s *Server) handleV2Data(w http.ResponseWriter, r *http.Request) {
 		if stale {
 			report.Stale = true
 		}
-		report.Countries = append(report.Countries, src.Country)
+		if !slices.Contains(report.Countries, src.Country) {
+			report.Countries = append(report.Countries, src.Country)
+		}
+		published := ""
+		if !src.PublishedAt.IsZero() {
+			published = src.PublishedAt.UTC().Format("2006-01-02")
+		}
 		report.Sources = append(report.Sources, DataSource{
+			PublishedAt: published,
+			Licence:     src.Licence,
+			TermsURL:    src.TermsURL,
+			Attribution: src.Attribution,
+			Partial:     src.Partial,
 			Country:     src.Country,
 			Name:        src.Name,
 			URL:         src.URL,

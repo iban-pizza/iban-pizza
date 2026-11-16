@@ -84,11 +84,14 @@ jobs:
 
                 docker pull ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }}
 
-            Every binary is static and needs no runtime dependency. The bank
-            data snapshot is compiled in, so the service answers immediately
-            with no configuration. Refresh the data with:
+            Every binary is static and needs no runtime dependency. No bank
+            data is included: download it from the official registries with
 
-                iban-pizza update --write-snapshot internal/embedded/snapshot.jsonl.gz
+                iban-pizza update
+
+            Each publisher's terms apply to the data you download; list them
+            with `iban-pizza sources`. Until then the service validates the
+            structure of an IBAN and resolves no bank.
 
             Verify a download against SHA256SUMS before running it.
 

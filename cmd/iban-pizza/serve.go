@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -66,10 +67,18 @@ func runServe(ctx context.Context, args []string) error {
 	var schemes *sepa.Registry
 	if *schemeFile != "" {
 		schemes, err = sepa.LoadDir(*schemeFile)
-		if err != nil {
+		switch {
+		case err != nil && schemeDirMissing(*schemeFile):
+			// Like the bank data, the register is downloaded by "iban-pizza
+			// update" and is absent on a fresh installation.
+			log.Warn("scheme register not downloaded yet, the schemes block is disabled; "+
+				"run \"iban-pizza update -scheme-dir\"", "path", *schemeFile)
+			schemes = nil
+		case err != nil:
 			return fmt.Errorf("load scheme register: %w", err)
+		default:
+			log.Info("scheme register loaded", "institutions", schemes.Len())
 		}
-		log.Info("scheme register loaded", "institutions", schemes.Len())
 	}
 
 	srv := api.New(api.Config{
@@ -113,6 +122,20 @@ func runServe(ctx context.Context, args []string) error {
 		defer cancel()
 		return httpServer.Shutdown(shutdownCtx)
 	}
+}
+
+// schemeDirMissing reports whether the scheme directory holds no exports yet.
+func schemeDirMissing(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return errors.Is(err, os.ErrNotExist)
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".csv") {
+			return false
+		}
+	}
+	return true
 }
 
 // splitOrigins parses the comma separated origin list.
